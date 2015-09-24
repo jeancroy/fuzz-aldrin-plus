@@ -29,7 +29,7 @@
     "matching",
     "filter",
     "search",
-    "highlight"
+    "highlight",
     "sublime"
   ],
   "devDependencies": {
