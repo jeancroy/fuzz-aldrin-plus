@@ -364,7 +364,7 @@ While the above matrix describe the computation, we do not need to store the who
 
 Suppose we process the cell [3,5]
 
-20, 21, 22, 23, 24, 25, 26, *27, 28, 29*  
+20, 21, 22, 23, 24, 25, 26, *27, 28, 29*   
 *30, 31, 32, 33, 34,* **35**, *36*, *37*, *38*, *39*  
 
 To build that score we only need values 24(DIAG), 25(UP), 34(LEFT).
@@ -372,14 +372,14 @@ So instead of a whole matrix we can keep only the two current lines.
 
 Furthermore, anything on the left of 24 on the first line is not needed anymore. Also on the second line, anything to right of 35 has not been computed yet. So we can build a more compact structure using one composite row + one diagonal.
 
-score_diag =  24
+score_diag =  24    
 score_row = 30, 31, 32, 33, 34, 25, 26, 27, 28, 29
 
 #### Preparing next value
 
 Once we have computed the value of the cell [3,5], we can insert it in the structure, taking care of saving next diagonal before overwriting it.
 
-diag =  25
+diag =  25    
 row = 30, 31, 32, 33, 34, **35**, 26, 27, 28, 29
 
 To compute value of cell [3,6] we take 
@@ -543,7 +543,8 @@ Before the first occurrence of the first char of query in the subject, or after 
 - Test 5 `nm`, exact acronym match, 98% positive, about 10% slower.
 
 - Test 6 `nodemodules` is special in that it use a string that score on almost every candidate, often multiple time per candidate and individuals characters are popular. It also avoid exact match speed-up. About 2x slower, but unlikely to happens in real life. `maxInners` mitigation cover that case.
-- 
+
+
 ````
 Filtering 66672 entries for 'index' took 62ms for 6168 results (~10% of results are positive, mix exact & fuzzy)
 Filtering 66672 entries for 'index' took 120ms for 6168 results (~10% of results are positive, Legacy method)
