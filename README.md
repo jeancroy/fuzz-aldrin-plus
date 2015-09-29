@@ -300,8 +300,9 @@ gsur-ve-y
 -surg-ery
 ````
 
-To get that alignment we start from the last character and trace back the best option. 
+For those familiar with code diff, this is basically the same problem. Except we do alignment of character in a word and diff perform alignment of lines in a file. Character present in second word but not the first are addition, character present only in the first are deletion, and character present in both are match - like unchanged lines in a diff.
 
+To get that alignment we start from the last character and trace back the best option. 
 The pattern to looks for an **alignment** is the corner increase (diagonal+1 is greater than left or up.)
 
 ````
@@ -365,7 +366,7 @@ While the above matrix describe the computation, we do not need to store the who
 Suppose we process the cell [3,5]
 
 20, 21, 22, 23, 24, 25, 26, *27, 28, 29*   
-*30, 31, 32, 33, 34,* **35**, *36*, *37*, *38*, *39*  
+*30, 31, 32, 33, 34,* **35**, 36, 37, 38, 39  
 
 To build that score we only need values 24(DIAG), 25(UP), 34(LEFT).
 So instead of a whole matrix we can keep only the two current lines.
@@ -441,14 +442,15 @@ This test for match points (or hits). It refer to the `diag+1` in the above algo
 
 
 **How often is that condition true ?**
-Let's consider an alphabet that contain 26 lowercase letters, 10 numbers, a few symbols ` _!?=<>`. That's a 40+ symbol alphabet.
-Under a uniform usage model of those symbols, we have the hit condition occurs about 2.5% of the time (1/40).
+Let's consider an alphabet that contain 26 lowercase letters, 10 numbers, a few symbols ` _!?=<>`. That's a 40+ symbol alphabet. Under a uniform usage model of those symbols, we have the hit condition occurs about 2.5% of the time (1/40).
 If we suppose only 10-20 of those character are popular the hit rate is about 5-10%.
 
+This mean we'll try to minimize the number of operation that happens outside of math points. Increasing the cost of a hit, while deceasing the cost of non hits looks like a possibly worthwhile proposition. 
 
-This mean we'll try to minimize the number of operation that happens outside of math points. - Increasing the cost of a hit, while deceasing the cost of non hits looks like a possibly worthwhile proposition. It also means we'll want to somewhat control the number of positive hit we'll compute.
+A connonical example of this is that, instead of testing each character against the list of separator, setting a flag for next character being a start-of-word, we first comfirm a match then look behind for separator. The characterisation works is sometime repeated more than once, but so far this scheme benchmarked better than alternatives we have tried to avoid doing extra work.
 
-This is also a natural fit to our logic, the most expensive part being to determine how to score similarity between characters (including context similarity)
+Having work concentrated at hit points is also a natural fit to our logic, the most expensive part being to determine how to score similarity between characters (including context similarity). However, it also means we'll want to somewhat control the number of positive hit we'll compute - that's the purpose of missed hit optimisation.
+
 
 ### What about stack of needles ?
 
