@@ -237,28 +237,24 @@ There are multiple thing we can improve if one day we implement a proper multipl
 
 ### Optional characters
 
-Legacy fuzzaldrin had some support for optional character (Mostly space, see `SpaceRegEx`). Because the scoring do not support errors, the optional character where simply removed from the query.
+Legacy fuzzaldrin had some support for optional characters (Mostly space, see `SpaceRegEx`). Because the scoring does not support errors, the optional character was simply removed from the query.
 
-With this PR, optimal alignment algorithm support an unlimited number of errors. The strict matching requirement is handled by a separate method `isMatch`. The optional character implementation is done by building a subset of query containing only non-optional character (`coreQuery`) and passing that to `isMatch`.
+With this PR, optimal alignment algorithm supports an unlimited number of errors. The strict matching requirement is handled by a separate method `isMatch`. The optional character implementation is done by building a subset of the query containing only non-optional characters (`coreQuery`) and passing that to `isMatch`.
 
-This new way of doing thing means that while some characters are optional, candidate that match those characters will have better score. What this allow is to add characters to the optional list without compromising ranking.
+This new way of doing thing means that while some characters are optional, candidates that match those characters have a better score. What this allow is to add characters to the optional list without compromising ranking.
 
-Character that has been added include `-` and `_` because multiple  specs require that we should threat them as space. Also `\` and `:` to support searching a file by PHP and Ruby name-space. Finally `/` to mirror `\` and support a better work flow in a multi-OS environment.
+Optional character contains space, but also `-` and `_` because multiple specs require that we should treat them as space. Also `\` and `:` are also optional to support searching a file using the PHP or Ruby name-space. Finally `/` is optional to mirror `\` and support a better workflow in a multi-OS environment.
 
-Finally option `allowErrors` would make any character optional. Expected effect of that would be spell-checker like, but slower match.
+Finally option `allowErrors` would make any character optional. Expected effect of that options would be some forgiveness on the spelling at the price of a slower match.
 
 
-### Path scoring
+### Path Scoring
 
-- Score for a path is made of about half score of full path and half score of basename.
+- Score for a given path is computed from the score of the fullpath and score of the filename. For low directory depth, the influence of both is about equal. But, for deeper directory, there is less retrieval effect (importance of basename) 
 
-- By default basename is what follow the last slash (after trailing slashes has been removed)
+- The full path is penalized twice for size. Once for its own size, then a second time for the size of the basename. Extra basename penalty is dampened a bit.
 
-- Exact balance between full path and basename is set by the directory depth: for deeper directory there is less retrieval effect (importance of basename) 
-
-- Full path is penalized twice for size. Once for it's own size, then a second time for size of the basename. This address various demand for shorter basename to win. Extra basename penalty is dampened a bit.
-
-- Basename is scored as if `allowErrors` was set to true. (Full-path must still pass `isMatch` test) This allow to support query such as `model user` against path `model/user`. Previously, the basename score would be 0 because it would not find `model` inside basename `user`. Variable `queryHasSlashes` sort of addressed this issue, but was inconsistent with usage of `<space>` as folder separator
+- The basename is scored as if `allowErrors` was set to true. (Full-path must still pass `isMatch` test).  This choice is made to support query such as `model user` against path `model/user`. Previously, the basename score would be 0 because it would not find `model` inside basename `user`. Variable `queryHasSlashes` partially addressed this issue, but was inconsistent with usage of `<space>` as folder separator
 
 - When query has slashes (`path.sep`) the last or last few folder from the path are promoted to the basename. (as many folder from the path as folder in the query)
 
@@ -270,9 +266,9 @@ Finally option `allowErrors` would make any character optional. Expected effect 
 Let's compare  A:`surgery` and B:`gsurvey`.
 To do so we can try to match every letter of A against every letter of B.
 
-This build a 2D Table.
-- The match start at [0,0] trying to compare first letter of each.
-- The match end at [m,n] comparing last letter of each.
+This problem can be solved using a score matrix.
+- The match starts at [0,0] trying to compare the first letter of each.
+- The match end at [m,n] comparing the last letter of each.
 
 At each position [i,j] the best move can be one of the 3 options.
 
@@ -280,7 +276,7 @@ At each position [i,j] the best move can be one of the 3 options.
 - skip `A[i]` (move left, copy score)
 - skip `B[j]` (move down, copy score)
 
-We don't know which one of these 3 is the best move until we reach the end, so we record the score of the best move so far. The last cell contain the score of the best alignment. If we want to output that alignment we need to rebuild it backward from the last cell.
+We do not know which one of these 3 is the best move until we reach the end, so we record the score of the best move so far. The last cell contains the score of the best alignment. If we want to output that alignment we need to rebuild it backward from the last cell.
 
 ````
     s u r g e r y
@@ -301,7 +297,7 @@ gsur-ve-y
 -surg-ery
 ````
 
-For those familiar with code diff, this is basically the same problem. Except we the do alignment of character in a word and diff perform alignment of lines in a file. Character present in the second word but not the first are addition, character present only in the first are deletion, and character present in both are match - like unchanged lines in a diff.
+For those familiar with code diff, this is essentially the same problem. Except, in this case, we the do the alignment of characters in a word and a diff performs alignment of lines in a file. Characters present in the second word but not in the first counts as additions; characters present only in the first word are deletions and characters present in both are matches - like unchanged lines in a diff.
 
 To get that alignment, we start from the last character and trace back the best option.  The pattern to looks for an **alignment** is the corner increase (diagonal+1 is greater than left or up.)
 
@@ -310,7 +306,7 @@ To get that alignment, we start from the last character and trace back the best 
 4,5   3,4   2,3    1,2    0,1
 ````
 
-- (There is an implicit row and column of 0 before the matrix)
+- (There are an implicit row and column of 0 before the matrix)
 
 The pattern to look for to **move left** is:
 
@@ -333,35 +329,32 @@ We try to resolve equality the following way:
 3,3
 ````
 
-1. Prefer moving UP: toward the start of the candidate. This will highlight start of string instead of the end.
+1. Prefer moving UP: toward the start of the candidate. This strategy ensures we highlight toward the start of string instead of the end when all else is equal.
 2. If not available, prefer moving LEFT (optional character)
-3. Only accept alignment DIAG when it's the absolute best option.
+3. Only accept alignment DIAG when it is the absolute best option.
 
 
 
 
 ### Algorithm Conclusion
 
-LCS allow to detect witch character of query are common to both word while being in proper order (for example g is common to both word but discarded because out of order.)
+The LCS algorithm allows to detect which character of the query are common to both words while being in proper order. (For example g is common to both word but discarded because out of order.)
 
-LCS is not immediately useful. This is because fuzzaldrin require ALL of query to be in subject, else the score is 0. So all non zero score would be the same.
+LCS is not immediately useful for fuzzaldrin needs. Because fuzzaldrin require ALL characters of the query to be in subject to have a score greater than 0, LCS for all positive candidates would be the length of the query.
 
-But the tool used to solve LCS is very useful to our need.
-The ability to select the best path and skip that `g` even if it is present is the key to improve over left-most alignment. (Skip one instance, select another one - or, in the case of optional character, none)
+However, the dynamic programming table used to solve LCS is very useful to our need. The ability to select the best path and skip that `g` even if it is present in both query and candidate is the key to improves over left-most alignment. All we need for this to works is a bit more detail in score than 0 or 1. 
 
 ### Similarity score
 
-LCS {0,1} score scheme ask the question is there a match for this character ? yes/no. However there could be different quality of match. For example variation of characters `e`, `E`, `é`, `è`, handwriting or phonetic similarity.
+Matching character does not have to be binary. Case sensitive match can still prefer proper case, same goes with accents. A diff tools can decide a line has been modified, instead of registering an addition and a deletion. A handwriting recognition tool can decide `a` and `o` are somewhat more similar to each other than they are to `w`, and so on.
 
-We use character similarity as a way to form and score patterns. That is, we consider that character are similar from their own quality (case) as well of being part of similar neighbourhood (consecutive letters or acronyms)
-
-This is a bit of a cheat after so much talk about how we should focus on pattern rather than characters, but it allow the granularity to form one pattern instead of another.
+We use character similarity as a way to build and score patterns. That is, we consider that character are similar from their own quality ( such as case) as well of being part of a similar neighborhood (consecutive letters or acronyms)
 
 There are some rules that limit our scoring ability (for example we cannot go back in time and correct the score based on future choice) but overall that scheme is very flexible.
 
-### Where is the matrix ?
+### Where is the matrix?
 
-While the above matrix describe the computation, we do not need to store the whole matrix when we only request the score. This is because while computing any cell we only need 3 other previously computed cell: UP, LEFT and DIAG.
+While the programming table describes computation, we do not need to store the whole matrix when we only output the score. Fundamentally when computing a score, we only need 3other previously computed cell: UP, LEFT and DIAG.
 
 Suppose we process the cell [3,5]
 
@@ -371,17 +364,17 @@ Suppose we process the cell [3,5]
 To build that score we only need values 24(DIAG), 25(UP), 34(LEFT).
 So instead of a whole matrix we can keep only the two current lines.
 
-Furthermore, anything on the left of 24 on the first line is not needed anymore. Also on the second line, anything to right of 35 has not been computed yet. So we can build a more compact structure using one composite row + one diagonal.
+Furthermore, anything on the left of 24 on the first line is not needed anymore. Also, anything to the right of 35 on the second line has not yet been computed. So we can build a more compact structure using one composite row + one diagonal.
 
 score_diag =  24    
-score_row = 30, 31, 32, 33, 34, 25, 26, 27, 28, 29
+score_row = 30, 31, 32, 33, 34, 25, 26, 27, 28, 29   
 
 #### Preparing next value
 
-Once we have computed the value of the cell [3,5], we can insert it in the structure, taking care of saving next diagonal before overwriting it.
+Once we have computed the value of the cell [3,5], we can insert that value into the structure, taking care of saving next diagonal before overwriting it.
 
 diag =  25    
-row = 30, 31, 32, 33, 34, **35**, 26, 27, 28, 29
+row = 30, 31, 32, 33, 34, **35**, 26, 27, 28, 29   
 
 To compute value of cell [3,6] we take 
 - UP value (26) from the row.
@@ -392,131 +385,121 @@ To compute value of cell [3,6] we take
 
 Before entering the matching process, the row is initialized with 0. Before scoring each row, the LEFT and DIAG register are reset to 0.
 
-This has the effect of placing a virtual row and column of 0 before the matrix. And allow to deal with boundary condition without any special case.
+That strategy has the effect of placing a virtual row and column of 0 before the matrix. Moreover, it allows to deal with boundary condition without any special case.
 
 ### Memory management
 
-We setup row vector to contain the query. So scoring a query of size 5 against a path of size 100, would require a `5x100 = 500` cells matrix. Instead we use a 5 item row + some registers. This should ease memory management pressure.
+We set up the row vector with the size of the query. Using a full matrix, scoring a query of size 5 against a path of size 100, would require a 500 cells. Instead, we use a 5 item row + some registers. This should ease memory management pressure.
 
-Each character of the query manage it's own best score. Or more precisely. Each cell `row[j]` manage the best score so far of matching `query[0..j]` until query is fully matched.
+Each character of the query manages its best score. More precisely, each cell `row[j]` manage the best score so far of matching `query[0..j]` against candidate[0..i]. 
 
 ### Consecutive Score (Neighbourhood) Matrix.
 
-We cache the consecutive score in a virtual matrix of the same size of score.
-We also use the composite row scheme to do that.
+We cache the consecutive score in a virtual matrix following the same composite row scheme that we do with score values.
 
-In highlight, (match) we make the consecutive bonus conditional to not breaking the chain before:
+In `fuzzaldrin.score` The candidate entirely determines the Neighbourhood quality. It is not affected by which character has been chosen. In highlight, (`fuzzaldrin.match`) we further refine the formula to make the consecutive bonus conditional to not breaking the consecutive chain:
 
-For example query `abcdz` vs subject `abcdzbcdz`. Between `abcd` and `bcdz`, `abcd` will win for being sooner in string. Now between the two `z`, the first one is isolated and the second one is part of a rank 4 group. However given that `bcd` are matched sooner the second z is really an isolated match, so the first one would win.
-
-For performance reason this is not done for filtering. However it produce not so intuitive result in highlight and thus it is addressed.
+For example query `abcdz` vs. subject `abcdzbcdz`. Between `abcd` and `bcdz`, `abcd` wins for being sooner in the string. Now between the two `z`, the first one is isolated and the second one is part of a rank 4 group. However given that `bcd` are matched sooner, the second `z` is an isolated match, so the first `z` wins.
 
 -------------
 
 ## Performance
 
 Let's consider the following autocomplete scenario.
-- Symbol bank have 1000 items.
-- User receive about 5 suggestion for it's query.
-- Of those 5, 1 is a case sensitive exact match.
-- That particular user almost always want that case sensitive match.
+- Symbol bank has 1000 items.
+- The user receives about 5 suggestion for its query.
+- Of those 5, 1 is a exact case-sensitive match.
+- That particular user almost always wants that case sensitive match.
 
-Should we optimize for case sensitive `indexOf` before trying other things ?
-Our answer to that question will be no. Case sensitive exact match are valuable because they are rare.
-Even if the user try to get them, for each one of those we have to reject 995 entry and deal with 4 other kind of match.
+Should we optimize for case sensitive `indexOf` before trying other things? Our answer to that question is no. 
 
-And that is our first principle for optimization: **Most of the haystack is not the needle**.
-Because rejection of candidate happens often we should be very fast at doing that. 
+Case sensitive exact match are valuable because they are rare. Even if the user tries to get them, for each one of those we have to reject 995 entry and deal with 4 other kinds of matches.
 
-Failing a test for case sensitive `indexOf` tell us exactly nothing for case-insensitive `indexOf` or acronym, or even scattered letters.
-That test is too specific. To reject match efficiently we should aim for the lowest common denominator: scattered case-insensitive match.
+This is our first principle for optimization: **Most of the haystack is not the needle**. Because rejection of candidate happens often, we should be very good at doing that. 
 
-And that is exactly the purpose of `isMatch`
+Failing a test for case-sensitive `indexOf` tell us exactly nothing for case-insensitive `indexOf`, or acronyms, or even scattered letters.
+That test is too specific. To reject match efficiently, we should aim for the lowest common denominator: scattered case-insensitive match.
+
+This is exactly the purpose of `isMatch`.
 
 ### Most of the haystack is not the needle
 
-That sentence is true at the candidate level, but also at the character level. 
+We just have shown how that sentence applies at the candidate level, but it is also at the character level. 
 
 **Let's consider this line: `if (subject_lw[i] == query_lw[j])`**
-This test for match points (or hits). It refer to the `diag+1` in the above algorithm description, with the `+1` being refined to handle different level of character and neighbourhood similarity.
+This test is for match points (or hits). It refers to the `diag+1` in the algorithm description, with the `+1` being refined to handle the differents levels of character and neighborhood similarity.
 
 
 **How often is that condition true ?**
-Let's consider an alphabet that contain 26 lowercase letters, 10 numbers, a few symbols ` _!?=<>`. That's a 40+ symbol alphabet. Under a uniform usage model of those symbols, we have the hit condition occurs about 2.5% of the time (1/40).
-If we suppose only 10-20 of those character are popular the hit rate is about 5-10%.
 
-This mean we'll try to minimize the number of operation that happens outside of math points. Increasing the cost of a hit, while deceasing the cost of non hits looks like a possibly worthwhile proposition. 
+Let's consider an alphabet that contain 26 lowercase letters, 10 numbers, a few symbols ` _!?=<>`. That is a 40+ symbol alphabet. Under a uniform usage model of those symbols, we have the hit condition occurs about 2.5% of the time (1/40). If we suppose only 10-20 of those characters are popular, the hit rate is about 5-10%.
 
-A connonical example of this is that, instead of testing each character against the list of separator, setting a flag for next character being a start-of-word, we first comfirm a match then look behind for separator. The characterisation works is sometime repeated more than once, but so far this scheme benchmarked better than alternatives we have tried to avoid doing extra work.
+This means we'll try to minimize the number of operation that happens outside of math points. In that context, increasing the cost of a hit, while decreasing the cost of non-hits looks like a possibly worthwhile proposition. 
 
-Having work concentrated at hit points is also a natural fit to our logic, the most expensive part being to determine how to score similarity between characters (including context similarity). However, it also means we'll want to somewhat control the number of positive hit we'll compute - that's the purpose of missed hit optimisation.
+A canonical example of this is that, instead of testing each character against the list of separators, setting a flag for next character being a start-of-word, we first confirm a match then look behind for separator. This characterization work is sometimes repeated more than once, but so far this scheme benchmarked better than alternatives we have tried to avoid doing extra work.
+
+Having work concentrated at hit points is also a natural fit to our logic, the most expensive part being to determine how to score similarity between characters (including context similarity). However, it also means we'll want to have some control over the number of positive hits we'll compute - that is the purpose of missed hit optimisation.
 
 
-### What about stack of needles ?
+### What about a stack of needles?
 
-To the extend the user is searching for a specific resource this should be uncommon.
+To the extent the user is searching for a specific resource, this should be uncommon.
 
-It can still happens in some situation such as:
+It can still happen in some situation such as:
  - Search is carried as user type (the query is not intentional)
- - Intentional query is not fully typed, match-all is a temporary step.
+ - The intentional query is not fully typed, match-all is a temporary step.
 
-One way to deal with that is to not use the full matching algorithm when we can deal with something simpler.
-Example `indexOf` instance. In an ideal world we would not use it because corner cases cause problem. But the next best option is to use exactly the same scoring algorithm for consecutive in optimal alignment and `indexOf`.
+One way to deal with that is not to use the full matching algorithm when we can deal with something simpler. This is what we have done while searching for `indexOf` instance. 
 
-One special note: Acronym still have to be checked even if we have an exact match.
+One special note: Acronym still have to be checked even if we have an exact match: for example query `su` against `StatusUrl`. As an exact match it is poor: 'Statu**sU**rl' is a middle of word match and have the wrong case. However as an acronym it is great: '**S**tatus**U**rl'. That motivated us to create the specialized `scoreAcronyms`.
 
-For example query `su` against `StatusUrl`. As an exact match it's poor: 'Statu**sU**rl' middle of word and wrong case.
-However as an acronym it's great: '**S**tatus**U**rl'. That motivated us to create the specialized `scoreAcronyms`
+What is nice is that while `scoreAcronyms` was created to speed up exact matches search, it also provided very valuable information for accuracy. It later became a corner stone in the processing of accidental acronym. 
 
-What is nice is that while `scoreAcronyms` was created to speed up exact search, it also provided very valuable information for accuracy.
-It latter became a corner stone in the processing of accidental acronym. 
-
-The result is that for exact match and exact acronym match we bypass the optimal alignment algorithm, giving very fast results.
-We still have to deal with fuzzier stack of needles and the next two optimization address this.
+The result is that for exact matches and exact acronym matches we bypass the optimal alignment algorithm, giving very fast results.
+We still have to deal with fuzzier stacks of needles and the next two optimization address this.
 
 ### Hit Miss Optimization.
 
 A hit occurs when character of query is also in the subject.
  - Every (i,j) such that subject[i] == query[j], in lowercase.
 
-A missed hit occurs when a hit does not improve score.
+A missed hit occurs when a hit does not improve the score.
 
 To guarantee optimal alignment, every hit has to be considered.
-However when candidate are long (deep path) & query contains popular character (vowels) , we can spend a huge amount of time scoring accidental hit.
+However when candidate are long (deep path) & query contains common use character, for example, vowels , we can spend a huge amount of time scoring accidental hits.
 
-So we use number of missed hit as a heuristic for unlikely to improve.
-Let's score `itc` vs `ImportanceTableControl`
+So we use the number of missed hit as a heuristic for current score that are unlikely to improve. Let's score `itc` vs `ImportanceTableControl`
 
 - `I` of `Importance`: First occurrence, improve over none.
 - `t` of `Importance`: First occurrence, improve over none.
 - `c` of `Importance`: First occurrence, improve over none.
-- `T` of `Table` : Acronym match, improve over isolated middle of word.
-- `C` of `Control` : Acronym match, improve over isolated middle of word.
+- `T` of `Table` : Acronym match, improve over an isolated middle of word.
+- `C` of `Control` : Acronym match, improve over an isolated middle of word.
 - `t` of `Control`: no improvement over acronym `T`: first hit miss.
 
-- After a certain threshold of hit miss we can consider it's unlikely the score will get better
+- After a certain threshold of missed hit we can consider it is unlikely the score will improve by much.
 - Despite above example hit miss optimization do not affect scoring of exact match (sub-string or acronym)
 - There are some legitimate use for hit miss, for example while scoring query `Mississippi` each positive match for `s` or `i` may trigger up to 3 hit miss on the other occurrence of that letter in query.
 
-- For that reason we propose counting consecutive hit miss and having maximum one hit miss per character of subject.
+- For that reason, we propose counting consecutive hit miss and having a maximum of one hit miss per character of the subject.
 
-**Q:** Does this grantee improvement over leftmost alignment ?
-**A:** It'll often be the case but no guarantee on pathological match.
- For example, in query `abcde` against candidate '**abc**abcabcabcabcabcabc_de' we may trigger the miss count before matching `de`. It'll still be registered as a match and probably a good one with `abc` at the start, `de` will be scored as optional characters not present.
+**Q:** Does this grantee improvement over leftmost alignment?
+**A:** It'll often be the case but no guarantee on pathological matches.
+ For example, in query `abcde` against candidate '**abc**abcabcabcabcabcabczde' we may trigger the miss count before matching `de`. It'll still be registered as a match and probably a good one with `abc` at the start, `de` will be scored as optional characters not present.
 
 Candidate  'abcabcabcabcabcabc**abcde**' will not have any problem because it does not affect exact match.
 
-Real example is searching `index` in the benchmark. Where `i`, `n`, `d`, `e` exist scattered in folder name, but x exist in the extension `.txt`. However the whole point of this PR is to prefer structured match to scattered one so this might not be a problem.
+A real world example is searching `index` in the benchmark. Where `i`, `n`, `d`, `e` exist scattered in folder name, but x exist in the extension `.txt`. However, the whole point of this project is to prefer structured match to scattered one so this might not be a problem.
 
 ### High Positive count mitigation
 **[option `maxInners`, disabled by default]**
 
-A lot of the speed of this PR come from the idea that rejection happens often and we need to be very efficient on them to offset slower higher quality match. Unfortunately some query will match against almost everything.
+A lot of the speed of this PR come from the idea that rejection happens often, and we need to be very efficient on them to offset slower higher quality match. Unfortunately, some query will match against almost everything.
 
 - Fast short-circuit path for exact substring acronym help a lot.
 - Missed hit heuristic also help a lot for general purpose match.
 
-However we may still be too slow for interactive time query on large data set. This is why `maxInners` option is provided.
+However, we may still be too slow for interactive time query on large data set. This is why `maxInners` option is provided.
 
 This is the maximum number of positive candidate we collect before sorting and returning the list.
 
@@ -524,16 +507,16 @@ The realization is that a query that match everything on a 50K item data set is 
 
 So then the priority is to detect such case of low quality (low discrimination power) query and report fast to the user so user can refine its query.
 
-A `maxInners` size of about 20% of the list works well. It is not needed on smaller list.
+A `maxInners` size of about 20% of the list works well. It is not needed on a smaller list.
 
 ### Active Region Optimization
 
-Before the first occurrence of the first char of query in the subject, or after the last occurrence of the last char of query in the subject it is impossible to make a match. So we'll trim the subject to that active region. The search for those boundary is linear while the optimal alignment algorithm is quadratic so it is an improvement however little or large we move.
+Before the first occurrence of the first char of query in the subject, or after the last occurrence of the last char of query in the subject it is impossible to make a match. So we'll trim the subject to that active region. The search for those boundaries is linear while the optimal alignment algorithm is quadratic, so it is an improvement, however, little or large we move.
 
 ### Benchmark
 - All test compare this PR to previous version (legacy)
 
-- The first test `index` is a typical use case, 10% positive, 1/3 of positive are exact match.
+- The first test `index` is a typical use case, 10% positive, 1/3 of positive are exact matches.
   - We are about 2x faster
 
 - Second test `indx` remove exact matches. Just under 2x faster
@@ -657,7 +640,7 @@ https://github.com/atom/fuzzy-finder/issues/91
 https://github.com/atom/fuzzaldrin/issues/24
 
 -> PHP Namespaces, let "\" match "/"
--> (would be nice for config file in mized OS environment too)
+-> (would be nice for config file in mixed OS environment too)
 
 https://github.com/atom/fuzzy-finder/pull/51
 
@@ -672,4 +655,4 @@ https://github.com/atom/fuzzy-finder/issues/10
 
 https://github.com/atom/fuzzy-finder/issues/21#issue-29106280
 -> we implement suggestion of score based on run length
--> todo allow fuzzaldrin to support external knowledge.
+-> todo allows fuzzaldrin to support external knowledge.
