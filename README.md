@@ -1,40 +1,39 @@
-## What is fuzzandrin-plus ?
+## What is fuzzaldrin-plus?
 
-- A fuzzy search / highlight that specialize for programmer text editor. It try to provide intuitive result be recognizing patterns in string that people use to reason with.
+- A fuzzy search / highlight that specialize for programmer text editor. It tries to provide intuitive result by recognizing patterns that people use while searching.
 
 - A rewrite of the fuzzaldrin library. API is backward compatible with some extra options. Tuning has been done from report usage of the Atom text editor.
 
-- At this point of time, it may be merged back into fuzzaldrin or live as it's own package, we'll see.
+- At this point in time, it may either be merged back into fuzzaldrin or lives as a forked library, we'll see.
 
 
-## What Problem are we trying to solve ?
+## What Problem are we trying to solve?
 
-### Score how matched characters relates to one another.
+### Score how matched characters relate to one another.
 
-- One of the most complained thing is not being able to find exact match.
-- A great source of questionable results come from scattered character, spread a bit randomly in the string.
+- One of the most often reported issues is not being able to find an exact match.
+- A great source of questionable results come from scattered character, spread seemingly randomly in the string.
 
-And we plan to address those issues by scoring run of consecutive characters.
-Exact match will be a special case where the run is 100% of the query length.
+We plan to address those issues by scoring runs of consecutive characters. In that scheme, an exact match will be a special case where the run is 100% of the query length.
 
-Up to now match length was used as a proxy for quality. This work reasonably well when subject is a single word, but break when subject contain multiple words, for example see:
+In original fuzzaldrin, candidate length was used as a proxy for match quality. This work reasonably well when subject is a single word, but break when subject contain multiple words, for example, see:
 
 - **Core**
 - **Co**nt**r**oll**e**r
 - Extention**Core**
 
-In `Core` vs `Controller` size is a good indicator of quality, but not so much in `Controller` vs `ExtentionCore`. This is because match compactness mater more than haystack size. Match compactness is the principle behind scoring of the Selecta project.
+In `Core` vs. `Controller` size is a good indicator of quality, but not so much in `Controller` vs. `ExtentionCore`. This situation happens because match compactness matters more than haystack size. Match compactness is the principle behind the scoring of the *Selecta* project.
 
 
 #### Run length / consecutive
 
-So far the examples can be handled by an `indexOf` call. However there are times where a single query can target multiple part of an candidate.
+So far the examples can be handled by an `indexOf` call. However, there are times where a single query can target multiple parts of a candidate.
 
-For example when candidate contain multiple words
-- `git push` vs `Git Plus: Push`
-- `email handler` vs `email/handler.py`
+For example when candidate contains multiple words
+- `git push` vs. `Git Plus: Push`
+- `email handler` vs. `email/handler.py`
 
-Another example is to jump above common strings.
+Another example is to jump over common strings.
 - `toLowerCase`
 - `toLocaleString`
 - `toLocalLowerCase`
@@ -44,7 +43,7 @@ We could use a query like `tololo`  to select the third option of these.
 
 ### Select character based on score.
 
-The current algorithm always select the first available matching character (leftmost alignment) then try to identify how it should be scored. The problem is that the most interesting instance of a character is not necessarily on the left.
+The previous algorithm always selects the first available matching character (leftmost alignment). Only after selection, it will try to identify how to score that character. The problem then is that the most interesting instance of a character is not necessarily on the left.
 
 For example on query `itc`, we should match
 -  **I**mportance**T**able**C**trl.
@@ -55,37 +54,38 @@ Instead leftmost aligement miss the acronym pattern:
 For query `core` against `controller_core` leftmost alignment miss the consecutive run:
 - **co**nt**r**oll**e**r_core
 
-To handle this we propose to setup the max run-length scoring inside an optimal alignment scheme. (Implemented for example using dynamic programming)
+To handle this, we propose to embed the pattern detection (consecutive and more) inside an optimal alignment scheme. Imagine you have an algorithm that allows you to recognize objects in images; it would make little sense to run it exclusively on the top left corner.
+
 
 ### Prevent Accidental acronym.
 
-Fuzzladrin handle acronym by giving a large per character bonus.  Currently a start of word bonus match almost as much as 3 proper case character (or 7 wrong case ones!)
+Fuzzladrin handles acronym by giving a large bonus on character matches that start words.  Currently, a start-of-word bonus matches almost as much as three proper-case character.
 
-For query install "install" should result be in this order ?
+For query `install` should result be in this order ?
 - F**in**d & Replace **S**elec**t** **All**
 - Application: **Install**
 
-Here we have '**S**elect **A**ll' boost the score of the first candidate because we match two word-start VS only one for 'install'.
+In that example, we have '**S**elect **A**ll' boost the score of the first candidate because we score two word-starts while we only score one for 'install'.
 
-For query "git push", should we order result in that order ?
+For query `git push`, should we order result in that order ?
 - "**Git** **P**l**u**s: **S**tage **H**unk"
 - "**Git** Plus: **Push**"
 
-What about the fact we match 3 start-of-word in `Plus Stage Hunk` ? PSH is very close to '**p**u**sh**'.
+What about the fact we match three start-of-words in `Plus Stage Hunk`? PSH is very close to '**p**u**sh**' (And `Plus` contains `u`).
 
-That kind of question arise even more often with optimal selection because the algorithm will lock on those extra acronym points.
+That kind of question arises even more often when we use optimal selection because the algorithm will lock on those extra acronym points.
 
-What we propose in this PR is that word start-of-word character only have a moderate advantage by themselves. Instead they form strong score by making an acronym pattern with other start-of-word character.
+What we propose in this project is that start-of-words characters should only have a moderate advantage by themselves. Instead, they form strong score by making an acronym pattern with other start-of-words characters.
 
 For example with query `push`:
-- match against `Plus: Stage Hunk`, we have P + u + SH so group of 1+1+2
-- match against `push` single group of 4.
-- The substring win for having the largest group
+- against `Plus: Stage Hunk`:  we have `P + u + SH`  grouped as 1, 1, 2
+- against `push`:  we have a  single group of 4.
+- The substring wins for having the largest group
 
 For example with query `psh`:
-- match against `Plus: Stage Hunk`, we have PSH so group of 3
-- match against `push`, we have p+sh so group of 1+2
-- The acronym win for having the largest group.
+- against `Plus: Stage Hunk`: we have `PSH` so a single group of 3
+- against `push`: we have `p + sh` so grouped as 1, 2
+- The acronym wins for having the largest group.
 
 
 This way we can score both substring and acronym match using the structure of the match. We'll refine the definition of consecutive acronym later.
@@ -93,104 +93,107 @@ This way we can score both substring and acronym match using the structure of th
 
 ### Score the context of the match.
 
-Some people proposed to give perfect score to exact case sensitive match. This can be understood because exact match and consecutive are two area where fuzzaldrin is not great.
+Some people proposed to give a perfect score to exact case-sensitive matches. This proposition can be understood because exact matches and  case-sensitivity are two area where fuzzaldrin is not great.
 
-However should 'sw**itc**h.css' be an exact match for `itc` ?
-Even when we have **I**mportance**T**able**C**trl available ?
+However should 'sw**itc**h.css' be an exact match for `itc`?
+Even when we have **I**mportance**T**able**C**trl available?
 
-Few people will argue against "diag" preferring "diagnostic" to "Diagnostics".
+Few people will argue against `diag` preferring `diagnostic` to `Diagnostics`.
 
-However should `install` prefer "Un**install**" over "**Install**" ? Or should it be the other way around ?  This is a case of case-sensitive match vs start-of-word ...
+However should `install` prefer "Un**install**" over "**Install**" ? Or should it be the other way around?  In this case, we have to consider the relative priority of case-sensitivity and start-of-word.
 
+Exact matches are used with enougth frequency that we should not only ensure they win against approximate matches but also ensure to rank quality properly amongst them.
 
 ### Manage the multiples balances of path scoring.
 
 We want to prefer match toward the start of the string.
-Except we also want to prefer match in the file-name (which happens near the end of the string)
+Except we also want to prefer match in the filename (which happens near the end of the string)
 
 We want to prefer shorter and shallower path.
-Except we want to retrieve some deeper file when file name is clearly better.
+Except we also want to retrieve some deeper files when filename is clearly better.
 
-We want to prefer match in the file-name
-Except when the query describe very well the full path.
-(see query `modeluser` vs `models/user.rb` or `moderator_column_users.rb`)
-
-
-## Proposed scoring
+We want to prefer matches in the filename
+Except when the query describes a full path much better than an approximate file name. (Let's consider query `model user` vs `models/user.rb` or `moderator_column_users.rb`)
 
 
-### 1. Characters are chosen by their ability to form pattern with others.
+## Proposed Scoring Rules
 
-Pattern can be made of
- - consecutive letter of the subject,
- - consecutive letter of the Acronym of subject.
 
-Start-of-word (acronym) character are special in that they can either make pattern with the rest of the word or other acronym character.
+### 1. Characters are chosen by their ability to form a pattern with others.
 
-- This replace a situation where acronym character had unconditional large bonus. Now the bonus is still large but conditional to being part of some pattern.
+Patterns can be composed of
+ - consecutive letters of the subject,
+ - sequential letters in the Acronym of the subject.
 
-- CamelCase and snake_case acronym are treated exactly the same. They will however get different point for matching uppercase/lowercase query
+Start-of-words (acronym) characters are special in that they can either forms pattern with the rest of the word or with other acronym characters.
+
+- Pattern based scoring replaces a situation where acronyms characters have a large bonus by themselves. Now the bonus is still large but conditional to being part of some pattern.
+
+- CamelCase and snake_case acronym are treated exactly the same. They will, however, get different score for matching uppercase/lowercase query
 
 
 ### 2. Primary score attribute is pattern length.
 
 - A pattern that span 100% of the query length is called an exact match.
- 	- There is such a thing as an acronym exact match.
+     - There is such a thing as an acronym exact match.
 
 - Because every candidate is expected to match all of query larger group should win against multiple smaller one.
-    - Rank of a candidate is the length of it's largest pattern.
-    - When every pattern in a candidate are larger than pattern in a second one, highest rank candidate is said to be dominant.
+    - The rank of a candidate is the length of it's largest pattern.
+    - When all patterns of a first candidate are larger than patterns in a second one, the candidate with the highest rank is said to be dominant.
         - 1 group of 6 >  2 group of 3 > 3 group of 2.
 
-	- When some group are larger and some are smaller, highest rank match is said to be semi-dominant.
-         - group of 4+2 vs 2 groups of 3. Group of 4 wins agains the first group of 3, group of 2 loose against second group of 3.
+    - When some groups are larger, and some are smaller, the highest rank match is said to be semi-dominant.
+         - Let's consider a first candidate grouped as 4+2 vs. a second candidate grouped as 3+3.
+              - The first group of 4 wins against the first group of 3.
+              - However, the group of 2 loose against the second group of 3.
+             - In this case, we'll consider some extra information.
 
-### 3. Secondary score attribute is match quality.
+### 3. Secondary score attribute is the quality of matches.
 
-- Match quality is made of proper-casing and context score
-    - Main role of match quality is to order candidate of the same rank.
-    - When match is semi-dominant match quality can overcome a rank-1 difference.
+- Match quality is made of proper casing and context score
+    - The main role of match quality is to order candidate of the same rank.
+    - When match is semi-dominant match quality can overcome a small rank difference.
 
-- Context score consider where does the match occurs in the subject.
-	- Full-word > Start-of-word > End-of-word > Middle-of-word
-	- On that list, Acronym pattern score at Start-of-word level. (That is just bellow full-word)
+- Context score considers where does the match occurs in the subject.
+    - Full-word > Start-of-word > End-of-word > Middle-of-word
+    - On that list, Acronym pattern score at Start-of-word level. (That is just bellow full-word)
 
-- Proper case is both gradual and absolute.
+- Score for a proper case query has both gradual and absolute components.
    - The less error, the better
-   - 100% Case Error will be called wrong-case, for example matching a CamelCase acronym using lowercase query.  
+   - 100% Case Error will be called wrong-case, for example matching a `CamelCase` acronym using lowercase query `cc`.  
    - Exactly 0 error is called CaseSentitive or ExactCase match.
-     They have a special bonus smaller than start-of-word bonus but greater than end-of-word bonus.
-     - This allow a start-of-word case sentitive match to overcome a full-word wrong-case match.
-     - Also allow to select between a lowercase consecutive and CamelCase acronym using case of query.
-     - Make "Installed" win over "Uninstall" because  start-of-word > Exact Case.
+     - CaseSentitive matches have a special bonus that is smaller than start-of-word bonus but greater than the end-of-word bonus.
+     - This scoring scheme allows a start-of-word case-sensitive match to overcome a full-word wrong-case match.
+     - It also allows to select between a lowercase consecutive and CamelCase acronym using case of query.
+     - To answer the question asked in the introduction, "Installed" win over "Uninstall" because start-of-word > Exact Case.
 
-- **Q:** Why can't you simply add extra length. For example add an extra virtual character for a start-of-word match.
-   - **A:** We cannot do that on partial match because then the optimal alignment algorithm will be happy to split word and collect start-of-word bonus like stamp. (See accidental acronym)
+- **Q:** Why can't you simply add extra length for some bonus. For example, score a start-of-word match as if it had an extra character.
+   - **A:** We cannot do that on partial matches because then the optimal alignment algorithm will be happy to split word and collect start-of-word bonus like stamps. (See accidental acronym)
 
-- **Q:** Why do you still do it on exact match ?
-   - **A:** First once you have matched everything there's no danger of splitting the query, then it's there for exact match to bubble up, despite longer/deeper path. If after more test/tuning we realize it's not needed, we'll be happy to remove it, the less corner case the merrier.
+- **Q:** Why do you add extra length on exact matches?
+   - **A:** First, once you have matched everything, there's no danger of splitting the query. Then,  that bonus exists to ensure exact matches will bubble up in the firsts results, despite longer/deeper path. If, after more test and tuning, we realize it's not needed, we'll be happy to remove it, the fewer corner cases, the merrier.
 
-- **Q:** Why are you using lowecase to detect CamelCase ?
-  - **A** CamelCase are detected as a switch from lowercase to UPPERCASE. Defining UPPERCASE as not-lowercase, allow case-invariant character to count as lowercase.   A lot of case invariant character are also separator, some are not such as number, and symbol such as `:!=<>()`
+- **Q:** Why are you using lowercase to detect CamelCase?
+  - **A** CamelCase are detected as a switch from lowercase to UPPERCASE. Defining UPPERCASE as not-lowercase, allow case-invariants characters to count as lowercase.   For example `Git Push` the `P` of push will be recognised as CamelCase because we consider `<space>` as lowercase. 
 
 ### 4. Tertiary score attributes are subject size, match position and directory depth
 
-- Mostly there to help order match of the same rank and match quality, unless the difference in tertiary attribute is large.
- 	-(Proper definition of large is to be determined using real life example)
+- Mostly there to help order match of the same rank and match quality, unless the difference in tertiary attributes is large.
+     -(Proper definition of large is to be determined using real life example)
 
-- In term of importance of effect it should rank start-of-string > string size > directory depth.
+- In term of the relative importance of effects it should rank start-of-string > string size > directory depth.
 
 ## Score Range
 
 - **Score is 0 if and only if there is no match.**
 
-- Otherwise it is strictly positive integer.
+- Otherwise, the score is a strictly positive integer.
 
-- The maximum range is `score(query,query)` whatever that number is. Longer query will have greater maximal score.
+- The maximum range is `score(query,query)` whatever that number is. A longer query will have a greater maximal score.
 
-- Score exist mainly to be compared with other score of the same query and implement scoring rule described above. 
+- Score exist mainly to for relative order with other scores of the same query and to implements scoring rule described above. 
 
-- Score have a high dynamic range and consider a lot of information. Equality is unlikely. For that reason, **multiplicative bonus should be preferred over additive ones**.
+- Score have a high dynamic range and consider a lot of information. Equality is unlikely. For that reason, **multiplicative bonuses should be preferred over additive ones**.
 
 -------------
 
@@ -198,9 +201,7 @@ Start-of-word (acronym) character are special in that they can either make patte
 More detail on acronym match
 
 
-The acronym prefix is a group of character that are consecutive in the query and sequential in the acronym of the subject.
-That group start at the first character of the query and end at the first error (character not in acronym).
-If there's no error we have an acronym exact match (100% of query is part of acronym)
+An acronym prefix is a group of characters that are consecutive in the query and sequential in the acronym of the subject. That group starts at the first character of the query and end at the first character of the query, not in the acronym. If there's no missed character, then we have an acronym exact match (100% of query is sequential in the acronym)
 
 
 **For example if we match `ssrb` against `Set Syntax Ruby` we'll score it like so**
@@ -211,10 +212,10 @@ If there's no error we have an acronym exact match (100% of query is part of acr
  "000 SSR0b0 0000"
 ````
 
-- Acronym scored as start-of-word consecutive rank 3 + an isolated letter.
+- Acronym scored as three consecutive character at start-of-word + an isolated letter.
 - Here we have a wrong-case match. "SSRb" or "SSRB" would have case-sensitive points on the acronym pattern (case of isolated letter is not important)
 - Position of the equivalent consecutive match is the average position of acronym characters.
-- Size of the candidate does not chance.
+- For scoring, we use the size of the original candidate.
 
 
 **Another example is matching `gaa` against `Git Plus: Add All` we'll score it like so**
@@ -279,7 +280,7 @@ At each position [i,j] the best move can be one of the 3 options.
 - skip `A[i]` (move left, copy score)
 - skip `B[j]` (move down, copy score)
 
-We don't know which one of these 3 is the best move until we reach the end, so we record the score of best move so far. The last cell contain the score of the best alignment. If we want to output that alignment we need to rebuild it backward from the last cell.
+We don't know which one of these 3 is the best move until we reach the end, so we record the score of the best move so far. The last cell contain the score of the best alignment. If we want to output that alignment we need to rebuild it backward from the last cell.
 
 ````
     s u r g e r y
@@ -300,10 +301,9 @@ gsur-ve-y
 -surg-ery
 ````
 
-For those familiar with code diff, this is basically the same problem. Except we do alignment of character in a word and diff perform alignment of lines in a file. Character present in second word but not the first are addition, character present only in the first are deletion, and character present in both are match - like unchanged lines in a diff.
+For those familiar with code diff, this is basically the same problem. Except we the do alignment of character in a word and diff perform alignment of lines in a file. Character present in the second word but not the first are addition, character present only in the first are deletion, and character present in both are match - like unchanged lines in a diff.
 
-To get that alignment we start from the last character and trace back the best option. 
-The pattern to looks for an **alignment** is the corner increase (diagonal+1 is greater than left or up.)
+To get that alignment, we start from the last character and trace back the best option.  The pattern to looks for an **alignment** is the corner increase (diagonal+1 is greater than left or up.)
 
 ````
 4,4   3,3   2,2    1,1    0,0
