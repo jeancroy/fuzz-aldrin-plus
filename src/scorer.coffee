@@ -15,7 +15,7 @@ wm = 150
 
 #Fading function
 pos_bonus = 20 # The character from 0..pos_bonus receive a bonus for being at the start of string.
-tau_size = 50 # Size at which the whole match score is halved.
+tau_size = 85 # Size at which the whole match score is halved.
 tau_depth = 13 # Directory depth at which the full path influence is halved
 
 # Miss count
@@ -459,7 +459,7 @@ basenameScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   # That way, more focused basePath match can overcome longer directory path.
 
   alpha = 0.5 * tau_depth / ( tau_depth + countDir(subject, end + 1) )
-  return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, 0.5 * (end - basePos))
+  return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, 1.2*(end - basePos))
 
 
 #
