@@ -53,7 +53,7 @@ module.exports =
     matches = matcher.match(string, string_lw, prepQuery)
 
     #if there is no matches on the full path, there should not be any on the base path either.
-    return matches if matches.length == 0
+    return matches if matches.length is 0
 
     # Is there a base path ?
     if(string.indexOf(PathSeparator) > -1)

@@ -16,7 +16,7 @@ exports.basenameMatch = (subject, subject_lw, prepQuery) ->
   basePos = subject.lastIndexOf(PathSeparator, end)
 
   #If no PathSeparator, no base path exist.
-  return [] if (basePos == -1)
+  return [] if (basePos is -1)
 
   # Get the number of folder in query
   depth = prepQuery.depth
@@ -24,10 +24,12 @@ exports.basenameMatch = (subject, subject_lw, prepQuery) ->
   # Get that many folder from subject
   while(depth-- > 0)
     basePos = subject.lastIndexOf(PathSeparator, basePos - 1)
-    return [] if (basePos == -1) #consumed whole subject ?
+    return [] if (basePos is -1) #consumed whole subject ?
 
   # Get basePath match
-  exports.match(subject[basePos + 1 ... end + 1], subject_lw[basePos + 1 ... end + 1], prepQuery, basePos + 1)
+  basePos++
+  end++
+  exports.match(subject[basePos ... end], subject_lw[basePos... end], prepQuery, basePos)
 
 
 #
@@ -36,16 +38,16 @@ exports.basenameMatch = (subject, subject_lw, prepQuery) ->
 #
 
 exports.mergeMatches = (a, b) ->
-  out = []
   m = a.length
   n = b.length
 
-  return a.slice() if n == 0
-  return b.slice() if m == 0
+  return a.slice() if n is 0
+  return b.slice() if m is 0
 
   i = -1
   j = 0
-  bj = b[0]
+  bj = b[j]
+  out = []
 
   while ++i < m
     ai = a[i]
@@ -73,10 +75,9 @@ exports.mergeMatches = (a, b) ->
 # Then we trace back to output matched characters.
 #
 # Differences are:
-# - we record values of gap
-# - we break consecutive sequence if we do not take the match.
+# - we record the best move at each position in a matrix, and finish by a traceback.
+# - we reset consecutive sequence if we do not take the match.
 # - no hit miss limit
-# - we record the best result in the trace matrix and we finish by a traceback.
 
 
 exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
@@ -93,10 +94,6 @@ exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
   score_row = new Array(n)
   csc_row = new Array(n)
 
-  vmax = 0
-  imax = -1
-  jmax = -1
-
   # Directions constants
   STOP = 0
   UP = 1
@@ -108,7 +105,7 @@ exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
   pos = -1
 
   #Fill with 0
-  j = -1
+  j = -1 #0..n-1
   while ++j < n
     score_row[j] = 0
     csc_row[j] = 0
@@ -130,13 +127,13 @@ exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
       score_diag = score_up
 
       #Compute a tentative match
-      if ( query_lw[j] == si_lw )
+      if ( query_lw[j] is si_lw )
 
         start = scorer.isWordStart(i, subject, subject_lw)
 
         # Forward search for a sequence of consecutive char
-        csc_score = if csc_diag > 0  then csc_diag else scorer.scoreConsecutives(subject, subject_lw, query, query_lw,
-          i, j, start)
+        csc_score = if csc_diag > 0  then csc_diag else
+          scorer.scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start)
 
         # Determine bonus for matching A[i] with B[j]
         align = score_diag + scorer.scoreCharacter(i, j, start, acro_score, csc_score)
@@ -145,37 +142,32 @@ exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
       score_up = score_row[j] # Current score_up is next run score diag
       csc_diag = csc_row[j]
 
-      #In case of equality, moving UP get us closer to the start of the string.
+      #In case of equality, moving UP get us closer to the start of the candidate string.
       if(score > score_up )
         move = LEFT
       else
         score = score_up
         move = UP
 
-      # In case of equality take the gap
+      # Only take alignment if it's the absolute best option.
       if(align > score)
         score = align
         move = DIAGONAL
       else
-        csc_score = 0 #If we do not use this character reset consecutive sequence.
-
+        #If we do not take this character, break consecutive sequence.
+        # (when consecutive is 0, it'll be recomputed)
+        csc_score = 0
 
       score_row[j] = score
       csc_row[j] = csc_score
       trace[++pos] = if(score > 0) then move else STOP
 
-  #if score > vmax
-  #  vmax = score
-  #  imax = i
-  #  jmax = j
-
-
   # -------------------
-  # Go back in the trace matrix from imax, jmax
-  # and collect diagonals
+  # Go back in the trace matrix
+  # and collect matches (diagonals)
 
-  i = m - 1 #imax
-  j = n - 1 #jmax
+  i = m - 1
+  j = n - 1
   pos = i * n + j
   backtrack = true
   matches = []
