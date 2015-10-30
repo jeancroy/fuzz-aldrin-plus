@@ -466,6 +466,16 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'core')).toBe candidates[2]
 
+    it "prefers matches that are together in the basename (even if basename is longer)", ->
+
+      candidates = [
+        path.join('tests','buyers','orders_e2e.js'),
+        path.join('tests','buyers','users-addresses_e2e.js')
+      ]
+
+      expect(bestMatch(candidates, 'us_e2', debug:true )).toBe candidates[1]
+
+
     it "allows to select using folder name", ->
 
       candidates = [
