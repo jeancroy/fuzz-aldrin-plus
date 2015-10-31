@@ -1,0 +1,851 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Fuzzaldrin-plus by jeancroy</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">Fuzzaldrin-plus</h1>
+        <p class="header">Sublime text like fuzzy filtering - compatible with fuzzaldrin</p>
+
+        <ul>
+          <li class="download"><a class="buttons" href="https://github.com/jeancroy/fuzzaldrin-plus/zipball/master">Download ZIP</a></li>
+          <li class="download"><a class="buttons" href="https://github.com/jeancroy/fuzzaldrin-plus/tarball/master">Download TAR</a></li>
+          <li><a class="buttons github" href="https://github.com/jeancroy/fuzzaldrin-plus">View On GitHub</a></li>
+        </ul>
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/jeancroy">jeancroy</a></p>
+
+
+      </header>
+      <section>
+        <h2>
+<a id="what-is-fuzzaldrin-plus" class="anchor" href="#what-is-fuzzaldrin-plus" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is fuzzaldrin-plus?</h2>
+
+<ul>
+<li><p>A fuzzy search / highlight that specialize for programmer text editor. It tries to provide intuitive result by recognizing patterns that people use while searching.</p></li>
+<li><p>A rewrite of the fuzzaldrin library. API is backward compatible with some extra options. Tuning has been done from report usage of the Atom text editor.</p></li>
+<li><p>At this point in time, it may either be merged back into fuzzaldrin or lives as a forked library, we'll see.</p></li>
+</ul>
+
+<h2>
+<a id="what-problem-are-we-trying-to-solve" class="anchor" href="#what-problem-are-we-trying-to-solve" aria-hidden="true"><span class="octicon octicon-link"></span></a>What Problem are we trying to solve?</h2>
+
+<h3>
+<a id="score-how-matched-characters-relate-to-one-another" class="anchor" href="#score-how-matched-characters-relate-to-one-another" aria-hidden="true"><span class="octicon octicon-link"></span></a>Score how matched characters relate to one another.</h3>
+
+<ul>
+<li>One of the most often reported issues is not being able to find an exact match.</li>
+<li>A great source of questionable results come from scattered character, spread seemingly randomly in the string.</li>
+</ul>
+
+<p>We plan to address those issues by scoring runs of consecutive characters. In that scheme, an exact match will be a special case where the run is 100% of the query length.</p>
+
+<p>In original fuzzaldrin, candidate length was used as a proxy for match quality. This work reasonably well when subject is a single word, but break when subject contain multiple words, for example, see:</p>
+
+<ul>
+<li><strong>Core</strong></li>
+<li>
+<strong>Co</strong>nt<strong>r</strong>oll<strong>e</strong>r</li>
+<li>Extention<strong>Core</strong>
+</li>
+</ul>
+
+<p>In <code>Core</code> vs. <code>Controller</code> size is a good indicator of quality, but not so much in <code>Controller</code> vs. <code>ExtentionCore</code>. This situation happens because match compactness matters more than haystack size. Match compactness is the principle behind the scoring of the <em>Selecta</em> project.</p>
+
+<h4>
+<a id="run-length--consecutive" class="anchor" href="#run-length--consecutive" aria-hidden="true"><span class="octicon octicon-link"></span></a>Run length / consecutive</h4>
+
+<p>So far the examples can be handled by an <code>indexOf</code> call. However, there are times where a single query can target multiple parts of a candidate.</p>
+
+<p>For example when candidate contains multiple words</p>
+
+<ul>
+<li>
+<code>git push</code> vs. <code>Git Plus: Push</code>
+</li>
+<li>
+<code>email handler</code> vs. <code>email/handler.py</code>
+</li>
+</ul>
+
+<p>Another example is to jump over common strings.</p>
+
+<ul>
+<li><code>toLowerCase</code></li>
+<li><code>toLocaleString</code></li>
+<li><code>toLocalLowerCase</code></li>
+</ul>
+
+<p>We could use a query like <code>tololo</code>  to select the third option of these.</p>
+
+<h3>
+<a id="select-character-based-on-score" class="anchor" href="#select-character-based-on-score" aria-hidden="true"><span class="octicon octicon-link"></span></a>Select character based on score.</h3>
+
+<p>The previous algorithm always selects the first available matching character (leftmost alignment). Only after selection, it will try to identify how to score that character. The problem then is that the most interesting instance of a character is not necessarily on the left.</p>
+
+<p>For example on query <code>itc</code>, we should match</p>
+
+<ul>
+<li> <strong>I</strong>mportance<strong>T</strong>able<strong>C</strong>trl.</li>
+</ul>
+
+<p>Instead leftmost aligement miss the acronym pattern:</p>
+
+<ul>
+<li>
+<strong>I</strong>mpor<strong>t</strong>an<strong>c</strong>eTableCtrl.</li>
+</ul>
+
+<p>For query <code>core</code> against <code>controller_core</code> leftmost alignment miss the consecutive run:</p>
+
+<ul>
+<li>
+<strong>co</strong>nt<strong>r</strong>oll<strong>e</strong>r_core</li>
+</ul>
+
+<p>To handle this, we propose to embed the pattern detection (consecutive and more) inside an optimal alignment scheme. Imagine you have an algorithm that allows you to recognize objects in images; it would make little sense to run it exclusively on the top left corner.</p>
+
+<h3>
+<a id="prevent-accidental-acronym" class="anchor" href="#prevent-accidental-acronym" aria-hidden="true"><span class="octicon octicon-link"></span></a>Prevent Accidental acronym.</h3>
+
+<p>Fuzzladrin handles acronym by giving a large bonus on character matches that start words.  Currently, a start-of-word bonus matches almost as much as three proper-case character.</p>
+
+<p>For query <code>install</code> should result be in this order ?</p>
+
+<ul>
+<li>F<strong>in</strong>d &amp; Replace <strong>S</strong>elec<strong>t</strong> <strong>All</strong>
+</li>
+<li>Application: <strong>Install</strong>
+</li>
+</ul>
+
+<p>In that example, we have '<strong>S</strong>elect <strong>A</strong>ll' boost the score of the first candidate because we score two word-starts while we only score one for 'install'.</p>
+
+<p>For query <code>git push</code>, should we order result in that order ?</p>
+
+<ul>
+<li>"<strong>Git</strong> <strong>P</strong>l<strong>u</strong>s: <strong>S</strong>tage <strong>H</strong>unk"</li>
+<li>"<strong>Git</strong> Plus: <strong>Push</strong>"</li>
+</ul>
+
+<p>What about the fact we match three start-of-words in <code>Plus Stage Hunk</code>? PSH is very close to '<strong>p</strong>u<strong>sh</strong>' (And <code>Plus</code> contains <code>u</code>).</p>
+
+<p>That kind of question arises even more often when we use optimal selection because the algorithm will lock on those extra acronym points.</p>
+
+<p>What we propose in this project is that start-of-words characters should only have a moderate advantage by themselves. Instead, they form strong score by making an acronym pattern with other start-of-words characters.</p>
+
+<p>For example with query <code>push</code>:</p>
+
+<ul>
+<li>against <code>Plus: Stage Hunk</code>:  we have <code>P + u + SH</code>  grouped as 1, 1, 2</li>
+<li>against <code>push</code>:  we have a  single group of 4.</li>
+<li>The substring wins for having the largest group</li>
+</ul>
+
+<p>For example with query <code>psh</code>:</p>
+
+<ul>
+<li>against <code>Plus: Stage Hunk</code>: we have <code>PSH</code> so a single group of 3</li>
+<li>against <code>push</code>: we have <code>p + sh</code> so grouped as 1, 2</li>
+<li>The acronym wins for having the largest group.</li>
+</ul>
+
+<p>This way we can score both substring and acronym match using the structure of the match. We'll refine the definition of consecutive acronym later.</p>
+
+<h3>
+<a id="score-the-context-of-the-match" class="anchor" href="#score-the-context-of-the-match" aria-hidden="true"><span class="octicon octicon-link"></span></a>Score the context of the match.</h3>
+
+<p>Some people proposed to give a perfect score to exact case-sensitive matches. This proposition can be understood because exact matches and  case-sensitivity are two area where fuzzaldrin is not great.</p>
+
+<p>However should 'sw<strong>itc</strong>h.css' be an exact match for <code>itc</code>?
+Even when we have <strong>I</strong>mportance<strong>T</strong>able<strong>C</strong>trl available?</p>
+
+<p>Few people will argue against <code>diag</code> preferring <code>diagnostic</code> to <code>Diagnostics</code>.</p>
+
+<p>However should <code>install</code> prefer "Un<strong>install</strong>" over "<strong>Install</strong>" ? Or should it be the other way around?  In this case, we have to consider the relative priority of case-sensitivity and start-of-word.</p>
+
+<p>Exact matches are used with enougth frequency that we should not only ensure they win against approximate matches but also ensure to rank quality properly amongst them.</p>
+
+<h3>
+<a id="manage-the-multiples-balances-of-path-scoring" class="anchor" href="#manage-the-multiples-balances-of-path-scoring" aria-hidden="true"><span class="octicon octicon-link"></span></a>Manage the multiples balances of path scoring.</h3>
+
+<p>We want to prefer match toward the start of the string.
+Except we also want to prefer match in the filename (which happens near the end of the string)</p>
+
+<p>We want to prefer shorter and shallower path.
+Except we also want to retrieve some deeper files when filename is clearly better.</p>
+
+<p>We want to prefer matches in the filename
+Except when the query describes a full path much better than an approximate file name. (Let's consider query <code>model user</code> vs <code>models/user.rb</code> or <code>moderator_column_users.rb</code>)</p>
+
+<h2>
+<a id="proposed-scoring-rules" class="anchor" href="#proposed-scoring-rules" aria-hidden="true"><span class="octicon octicon-link"></span></a>Proposed Scoring Rules</h2>
+
+<h3>
+<a id="1-characters-are-chosen-by-their-ability-to-form-a-pattern-with-others" class="anchor" href="#1-characters-are-chosen-by-their-ability-to-form-a-pattern-with-others" aria-hidden="true"><span class="octicon octicon-link"></span></a>1. Characters are chosen by their ability to form a pattern with others.</h3>
+
+<p>Patterns can be composed of</p>
+
+<ul>
+<li>consecutive letters of the subject,</li>
+<li>sequential letters in the Acronym of the subject.</li>
+</ul>
+
+<p>Start-of-words (acronym) characters are special in that they can either forms pattern with the rest of the word or with other acronym characters.</p>
+
+<ul>
+<li><p>Pattern based scoring replaces a situation where acronyms characters have a large bonus by themselves. Now the bonus is still large but conditional to being part of some pattern.</p></li>
+<li><p>CamelCase and snake_case acronym are treated exactly the same. They will, however, get different score for matching uppercase/lowercase query</p></li>
+</ul>
+
+<h3>
+<a id="2-primary-score-attribute-is-pattern-length" class="anchor" href="#2-primary-score-attribute-is-pattern-length" aria-hidden="true"><span class="octicon octicon-link"></span></a>2. Primary score attribute is pattern length.</h3>
+
+<ul>
+<li>
+<p>A pattern that span 100% of the query length is called an exact match.</p>
+
+<ul>
+<li>There is such a thing as an acronym exact match.</li>
+</ul>
+</li>
+<li>
+<p>Because every candidate is expected to match all of query larger group should win against multiple smaller one.</p>
+
+<ul>
+<li>The rank of a candidate is the length of it's largest pattern.</li>
+<li>
+<p>When all patterns of a first candidate are larger than patterns in a second one, the candidate with the highest rank is said to be dominant.</p>
+
+<ul>
+<li>1 group of 6 &gt;  2 group of 3 &gt; 3 group of 2.</li>
+</ul>
+</li>
+<li>
+<p>When some groups are larger, and some are smaller, the highest rank match is said to be semi-dominant.</p>
+
+<ul>
+<li>Let's consider a first candidate grouped as 4+2 vs. a second candidate grouped as 3+3.
+
+<ul>
+<li>The first group of 4 wins against the first group of 3.</li>
+<li>However, the group of 2 loose against the second group of 3.
+
+<ul>
+<li>In this case, we'll consider some extra information.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<h3>
+<a id="3-secondary-score-attribute-is-the-quality-of-matches" class="anchor" href="#3-secondary-score-attribute-is-the-quality-of-matches" aria-hidden="true"><span class="octicon octicon-link"></span></a>3. Secondary score attribute is the quality of matches.</h3>
+
+<ul>
+<li>
+<p>Match quality is made of proper casing and context score</p>
+
+<ul>
+<li>The main role of match quality is to order candidate of the same rank.</li>
+<li>When match is semi-dominant match quality can overcome a small rank difference.</li>
+</ul>
+</li>
+<li>
+<p>Context score considers where does the match occurs in the subject.</p>
+
+<ul>
+<li>Full-word &gt; Start-of-word &gt; End-of-word &gt; Middle-of-word</li>
+<li>On that list, Acronym pattern score at Start-of-word level. (That is just bellow full-word)</li>
+</ul>
+</li>
+<li>
+<p>Score for a proper case query has both gradual and absolute components.</p>
+
+<ul>
+<li>The less error, the better</li>
+<li>100% Case Error will be called wrong-case, for example matching a <code>CamelCase</code> acronym using lowercase query <code>cc</code>.<br>
+</li>
+<li>Exactly 0 error is called CaseSentitive or ExactCase match.
+
+<ul>
+<li>CaseSentitive matches have a special bonus that is smaller than start-of-word bonus but greater than the end-of-word bonus.</li>
+<li>This scoring scheme allows a start-of-word case-sensitive match to overcome a full-word wrong-case match.</li>
+<li>It also allows to select between a lowercase consecutive and CamelCase acronym using case of query.</li>
+<li>To answer the question asked in the introduction, "Installed" win over "Uninstall" because start-of-word &gt; Exact Case.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Q:</strong> Why can't you simply add extra length for some bonus. For example, score a start-of-word match as if it had an extra character.</p>
+
+<ul>
+<li>
+<strong>A:</strong> We cannot do that on partial matches because then the optimal alignment algorithm will be happy to split word and collect start-of-word bonus like stamps. (See accidental acronym)</li>
+</ul>
+</li>
+<li>
+<p><strong>Q:</strong> Why do you add extra length on exact matches?</p>
+
+<ul>
+<li>
+<strong>A:</strong> First, once you have matched everything, there's no danger of splitting the query. Then,  that bonus exists to ensure exact matches will bubble up in the firsts results, despite longer/deeper path. If, after more test and tuning, we realize it's not needed, we'll be happy to remove it, the fewer corner cases, the merrier.</li>
+</ul>
+</li>
+<li>
+<p><strong>Q:</strong> Why are you using lowercase to detect CamelCase?</p>
+
+<ul>
+<li>
+<strong>A</strong> CamelCase are detected as a switch from lowercase to UPPERCASE. Defining UPPERCASE as not-lowercase, allow case-invariants characters to count as lowercase.   For example <code>Git Push</code> the <code>P</code> of push will be recognised as CamelCase because we consider <code>&lt;space&gt;</code> as lowercase. </li>
+</ul>
+</li>
+</ul>
+
+<h3>
+<a id="4-tertiary-score-attributes-are-subject-size-match-position-and-directory-depth" class="anchor" href="#4-tertiary-score-attributes-are-subject-size-match-position-and-directory-depth" aria-hidden="true"><span class="octicon octicon-link"></span></a>4. Tertiary score attributes are subject size, match position and directory depth</h3>
+
+<ul>
+<li><p>Mostly there to help order match of the same rank and match quality, unless the difference in tertiary attributes is large.
+ -(Proper definition of large is to be determined using real life example)</p></li>
+<li><p>In term of the relative importance of effects it should rank start-of-string &gt; string size &gt; directory depth.</p></li>
+</ul>
+
+<h2>
+<a id="score-range" class="anchor" href="#score-range" aria-hidden="true"><span class="octicon octicon-link"></span></a>Score Range</h2>
+
+<ul>
+<li><p><strong>Score is 0 if and only if there is no match.</strong></p></li>
+<li><p>Otherwise, the score is a strictly positive integer.</p></li>
+<li><p>The maximum range is <code>score(query,query)</code> whatever that number is. A longer query will have a greater maximal score.</p></li>
+<li><p>Score exist mainly to for relative order with other scores of the same query and to implements scoring rule described above. </p></li>
+<li><p>Score have a high dynamic range and consider a lot of information. Equality is unlikely. For that reason, <strong>multiplicative bonuses should be preferred over additive ones</strong>.</p></li>
+</ul>
+
+<hr>
+
+<h3>
+<a id="acronym-prefix" class="anchor" href="#acronym-prefix" aria-hidden="true"><span class="octicon octicon-link"></span></a>Acronym Prefix</h3>
+
+<p>More detail on acronym match</p>
+
+<p>An acronym prefix is a group of characters that are consecutive in the query and sequential in the acronym of the subject. That group starts at the first character of the query and end at the first character of the query, not in the acronym. If there's no missed character, then we have an acronym exact match (100% of query is sequential in the acronym)</p>
+
+<p><strong>For example if we match <code>ssrb</code> against <code>Set Syntax Ruby</code> we'll score it like so</strong></p>
+
+<pre><code>  012345678901234
+ "Set Syntax Ruby"
+ "000 SSR0b0 0000"
+</code></pre>
+
+<ul>
+<li>Acronym scored as three consecutive character at start-of-word + an isolated letter.</li>
+<li>Here we have a wrong-case match. "SSRb" or "SSRB" would have case-sensitive points on the acronym pattern (case of isolated letter is not important)</li>
+<li>Position of the equivalent consecutive match is the average position of acronym characters.</li>
+<li>For scoring, we use the size of the original candidate.</li>
+</ul>
+
+<p><strong>Another example is matching <code>gaa</code> against <code>Git Plus: Add All</code> we'll score it like so</strong></p>
+
+<pre><code>  01234567890123456
+ "Git Plus: Add All"
+ "000000 GAA00 0000"
+</code></pre>
+
+<ul>
+<li>here we conveniently allow to skip the <code>P</code> of <code>Plus</code>.</li>
+</ul>
+
+<p><strong>Then what about something like "git aa" ?</strong></p>
+
+<p>This is a current limitation. We do not support acronym pattern outside of the prefix. Mostly for performance reason.
+Acronym outside of the acronym prefix will have some bonus, scoring between isolated character and 2 consecutive.
+There are multiple thing we can improve if one day we implement a proper multiple word query support, and this is one of them.</p>
+
+<h3>
+<a id="optional-characters" class="anchor" href="#optional-characters" aria-hidden="true"><span class="octicon octicon-link"></span></a>Optional characters</h3>
+
+<p>Legacy fuzzaldrin had some support for optional characters (Mostly space, see <code>SpaceRegEx</code>). Because the scoring does not support errors, the optional character was simply removed from the query.</p>
+
+<p>With this PR, optimal alignment algorithm supports an unlimited number of errors. The strict matching requirement is handled by a separate method <code>isMatch</code>. The optional character implementation is done by building a subset of the query containing only non-optional characters (<code>coreQuery</code>) and passing that to <code>isMatch</code>.</p>
+
+<p>This new way of doing thing means that while some characters are optional, candidates that match those characters have a better score. What this allow is to add characters to the optional list without compromising ranking.</p>
+
+<p>Optional character contains space, but also <code>-</code> and <code>_</code> because multiple specs require that we should treat them as space. Also <code>\</code> and <code>:</code> are also optional to support searching a file using the PHP or Ruby name-space. Finally <code>/</code> is optional to mirror <code>\</code> and support a better workflow in a multi-OS environment.</p>
+
+<p>Finally option <code>allowErrors</code> would make any character optional. Expected effect of that options would be some forgiveness on the spelling at the price of a slower match.</p>
+
+<h3>
+<a id="path-scoring" class="anchor" href="#path-scoring" aria-hidden="true"><span class="octicon octicon-link"></span></a>Path Scoring</h3>
+
+<ul>
+<li><p>Score for a given path is computed from the score of the fullpath and score of the filename. For low directory depth, the influence of both is about equal. But, for deeper directory, there is less retrieval effect (importance of basename) </p></li>
+<li><p>The full path is penalized twice for size. Once for its own size, then a second time for the size of the basename. Extra basename penalty is dampened a bit.</p></li>
+<li><p>The basename is scored as if <code>allowErrors</code> was set to true. (Full-path must still pass <code>isMatch</code> test).  This choice is made to support query such as <code>model user</code> against path <code>model/user</code>. Previously, the basename score would be 0 because it would not find <code>model</code> inside basename <code>user</code>. Variable <code>queryHasSlashes</code> partially addressed this issue, but was inconsistent with usage of <code>&lt;space&gt;</code> as folder separator</p></li>
+<li><p>When query has slashes (<code>path.sep</code>) the last or last few folder from the path are promoted to the basename. (as many folder from the path as folder in the query)</p></li>
+</ul>
+
+<hr>
+
+<h2>
+<a id="algorithm-optimal-alignment" class="anchor" href="#algorithm-optimal-alignment" aria-hidden="true"><span class="octicon octicon-link"></span></a>Algorithm (Optimal alignment)</h2>
+
+<h3>
+<a id="lcs-dynamic-programming-table" class="anchor" href="#lcs-dynamic-programming-table" aria-hidden="true"><span class="octicon octicon-link"></span></a>LCS: Dynamic programming Table</h3>
+
+<p>Let's compare  A:<code>surgery</code> and B:<code>gsurvey</code>.
+To do so we can try to match every letter of A against every letter of B.</p>
+
+<p>This problem can be solved using a score matrix.</p>
+
+<ul>
+<li>The match starts at [0,0] trying to compare the first letter of each.</li>
+<li>The match end at [m,n] comparing the last letter of each.</li>
+</ul>
+
+<p>At each position [i,j] the best move can be one of the 3 options.</p>
+
+<ul>
+<li>match <code>A[i]</code> with <code>B[j]</code> (move diagonal, add 1 to score)</li>
+<li>skip <code>A[i]</code> (move left, copy score)</li>
+<li>skip <code>B[j]</code> (move down, copy score)</li>
+</ul>
+
+<p>We do not know which one of these 3 is the best move until we reach the end, so we record the score of the best move so far. The last cell contains the score of the best alignment. If we want to output that alignment we need to rebuild it backward from the last cell.</p>
+
+<pre><code>    s u r g e r y
+ g [0,0,0,1,1,1,1]  : best move is to align `g` of *g*survey with `g` of  sur*g*ery, score 1
+ s [1,1,1,1,1,1,1]  : we can align `s`, but doing so invalidate `g`. Both score 1, we cannot decide
+ u [1,2,2,2,2,2,2]  : if we align s, we can also align u, we have a winner
+ r [1,2,3,3,3,3,3]  : we can align `r`
+ v [1,2,3,3,3,3,3]  : nothing we can do with that `v`, score stay the same
+ e [1,2,3,3,4,4,4]  : we can align `e`  (we skipped `g` the same way we skipped `v`)
+ y [1,2,3,3,4,4,5]  : align y (we skipped `r` )
+</code></pre>
+
+<p><strong>Best alignment is</strong></p>
+
+<pre><code>gsur-ve-y
+-|||--|-|
+-surg-ery
+</code></pre>
+
+<p>For those familiar with code diff, this is essentially the same problem. Except, in this case, we the do the alignment of characters in a word and a diff performs alignment of lines in a file. Characters present in the second word but not in the first counts as additions; characters present only in the first word are deletions and characters present in both are matches - like unchanged lines in a diff.</p>
+
+<p>To get that alignment, we start from the last character and trace back the best option.  The pattern to looks for an <strong>alignment</strong> is the corner increase (diagonal+1 is greater than left or up.)</p>
+
+<pre><code>4,4   3,3   2,2    1,1    0,0
+4,5   3,4   2,3    1,2    0,1
+</code></pre>
+
+<ul>
+<li>(There are an implicit row and column of 0 before the matrix)</li>
+</ul>
+
+<p>The pattern to look for to <strong>move left</strong> is:</p>
+
+<pre><code>3,3
+4,4
+</code></pre>
+
+<p>The pattern to look for to <strong>move up</strong> is:</p>
+
+<pre><code>3,4
+3,4
+</code></pre>
+
+<p>We try to resolve equality the following way:</p>
+
+<pre><code>3,3
+3,3
+</code></pre>
+
+<ol>
+<li>Prefer moving UP: toward the start of the candidate. This strategy ensures we highlight toward the start of string instead of the end when all else is equal.</li>
+<li>If not available, prefer moving LEFT (optional character)</li>
+<li>Only accept alignment DIAG when it is the absolute best option.</li>
+</ol>
+
+<h3>
+<a id="algorithm-conclusion" class="anchor" href="#algorithm-conclusion" aria-hidden="true"><span class="octicon octicon-link"></span></a>Algorithm Conclusion</h3>
+
+<p>The LCS algorithm allows to detect which character of the query are common to both words while being in proper order. (For example g is common to both word but discarded because out of order.)</p>
+
+<p>LCS is not immediately useful for fuzzaldrin needs. Because fuzzaldrin require ALL characters of the query to be in subject to have a score greater than 0, LCS for all positive candidates would be the length of the query.</p>
+
+<p>However, the dynamic programming table used to solve LCS is very useful to our need. The ability to select the best path and skip that <code>g</code> even if it is present in both query and candidate is the key to improves over left-most alignment. All we need for this to works is a bit more detail in score than 0 or 1. </p>
+
+<h3>
+<a id="similarity-score" class="anchor" href="#similarity-score" aria-hidden="true"><span class="octicon octicon-link"></span></a>Similarity score</h3>
+
+<p>Matching character does not have to be binary. Case sensitive match can still prefer proper case, same goes with accents. A diff tools can decide a line has been modified, instead of registering an addition and a deletion. A handwriting recognition tool can decide <code>a</code> and <code>o</code> are somewhat more similar to each other than they are to <code>w</code>, and so on.</p>
+
+<p>We use character similarity as a way to build and score patterns. That is, we consider that character are similar from their own quality ( such as case) as well of being part of a similar neighborhood (consecutive letters or acronyms)</p>
+
+<p>There are some rules that limit our scoring ability (for example we cannot go back in time and correct the score based on future choice) but overall that scheme is very flexible.</p>
+
+<h3>
+<a id="where-is-the-matrix" class="anchor" href="#where-is-the-matrix" aria-hidden="true"><span class="octicon octicon-link"></span></a>Where is the matrix?</h3>
+
+<p>While the programming table describes computation, we do not need to store the whole matrix when we only output the score. Fundamentally when computing a score, we only need 3other previously computed cell: UP, LEFT and DIAG.</p>
+
+<p>Suppose we process the cell [3,5]</p>
+
+<p>20, 21, 22, 23, 24, 25, 26, <em>27, 28, 29</em><br>
+<em>30, 31, 32, 33, 34,</em> <strong>35</strong>, 36, 37, 38, 39  </p>
+
+<p>To build that score we only need values 24(DIAG), 25(UP), 34(LEFT).
+So instead of a whole matrix we can keep only the two current lines.</p>
+
+<p>Furthermore, anything on the left of 24 on the first line is not needed anymore. Also, anything to the right of 35 on the second line has not yet been computed. So we can build a more compact structure using one composite row + one diagonal.</p>
+
+<p>score_diag =  24<br>
+score_row = 30, 31, 32, 33, 34, 25, 26, 27, 28, 29   </p>
+
+<h4>
+<a id="preparing-next-value" class="anchor" href="#preparing-next-value" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preparing next value</h4>
+
+<p>Once we have computed the value of the cell [3,5], we can insert that value into the structure, taking care of saving next diagonal before overwriting it.</p>
+
+<p>diag =  25<br>
+row = 30, 31, 32, 33, 34, <strong>35</strong>, 26, 27, 28, 29   </p>
+
+<p>To compute value of cell [3,6] we take </p>
+
+<ul>
+<li>UP value (26) from the row.</li>
+<li>DIAG value, from the diag register. </li>
+<li>LEFT value from the previously computed value: 35</li>
+</ul>
+
+<h3>
+<a id="initial-values" class="anchor" href="#initial-values" aria-hidden="true"><span class="octicon octicon-link"></span></a>Initial values</h3>
+
+<p>Before entering the matching process, the row is initialized with 0. Before scoring each row, the LEFT and DIAG register are reset to 0.</p>
+
+<p>That strategy has the effect of placing a virtual row and column of 0 before the matrix. Moreover, it allows to deal with boundary condition without any special case.</p>
+
+<h3>
+<a id="memory-management" class="anchor" href="#memory-management" aria-hidden="true"><span class="octicon octicon-link"></span></a>Memory management</h3>
+
+<p>We set up the row vector with the size of the query. Using a full matrix, scoring a query of size 5 against a path of size 100, would require a 500 cells. Instead, we use a 5 item row + some registers. This should ease memory management pressure.</p>
+
+<p>Each character of the query manages its best score. More precisely, each cell <code>row[j]</code> manage the best score so far of matching <code>query[0..j]</code> against candidate[0..i]. </p>
+
+<h3>
+<a id="consecutive-score-neighbourhood-matrix" class="anchor" href="#consecutive-score-neighbourhood-matrix" aria-hidden="true"><span class="octicon octicon-link"></span></a>Consecutive Score (Neighbourhood) Matrix.</h3>
+
+<p>We cache the consecutive score in a virtual matrix following the same composite row scheme that we do with score values.</p>
+
+<p>In <code>fuzzaldrin.score</code> The candidate entirely determines the Neighbourhood quality. It is not affected by which character has been chosen. In highlight, (<code>fuzzaldrin.match</code>) we further refine the formula to make the consecutive bonus conditional to not breaking the consecutive chain:</p>
+
+<p>For example query <code>abcdz</code> vs. subject <code>abcdzbcdz</code>. Between <code>abcd</code> and <code>bcdz</code>, <code>abcd</code> wins for being sooner in the string. Now between the two <code>z</code>, the first one is isolated and the second one is part of a rank 4 group. However given that <code>bcd</code> are matched sooner, the second <code>z</code> is an isolated match, so the first <code>z</code> wins.</p>
+
+<hr>
+
+<h2>
+<a id="performance" class="anchor" href="#performance" aria-hidden="true"><span class="octicon octicon-link"></span></a>Performance</h2>
+
+<p>Let's consider the following autocomplete scenario.</p>
+
+<ul>
+<li>Symbol bank has 1000 items.</li>
+<li>The user receives about 5 suggestion for its query.</li>
+<li>Of those 5, 1 is a exact case-sensitive match.</li>
+<li>That particular user almost always wants that case sensitive match.</li>
+</ul>
+
+<p>Should we optimize for case sensitive <code>indexOf</code> before trying other things? Our answer to that question is no. </p>
+
+<p>Case sensitive exact match are valuable because they are rare. Even if the user tries to get them, for each one of those we have to reject 995 entry and deal with 4 other kinds of matches.</p>
+
+<p>This is our first principle for optimization: <strong>Most of the haystack is not the needle</strong>. Because rejection of candidate happens often, we should be very good at doing that. </p>
+
+<p>Failing a test for case-sensitive <code>indexOf</code> tell us exactly nothing for case-insensitive <code>indexOf</code>, or acronyms, or even scattered letters.
+That test is too specific. To reject match efficiently, we should aim for the lowest common denominator: scattered case-insensitive match.</p>
+
+<p>This is exactly the purpose of <code>isMatch</code>.</p>
+
+<h3>
+<a id="most-of-the-haystack-is-not-the-needle" class="anchor" href="#most-of-the-haystack-is-not-the-needle" aria-hidden="true"><span class="octicon octicon-link"></span></a>Most of the haystack is not the needle</h3>
+
+<p>We just have shown how that sentence applies at the candidate level, but it is also at the character level. </p>
+
+<p><strong>Let's consider this line: <code>if (subject_lw[i] == query_lw[j])</code></strong>
+This test is for match points (or hits). It refers to the <code>diag+1</code> in the algorithm description, with the <code>+1</code> being refined to handle the differents levels of character and neighborhood similarity.</p>
+
+<p><strong>How often is that condition true ?</strong></p>
+
+<p>Let's consider an alphabet that contain 26 lowercase letters, 10 numbers, a few symbols <code>_!?=&lt;&gt;</code>. That is a 40+ symbol alphabet. Under a uniform usage model of those symbols, we have the hit condition occurs about 2.5% of the time (1/40). If we suppose only 10-20 of those characters are popular, the hit rate is about 5-10%.</p>
+
+<p>This means we'll try to minimize the number of operation that happens outside of math points. In that context, increasing the cost of a hit, while decreasing the cost of non-hits looks like a possibly worthwhile proposition. </p>
+
+<p>A canonical example of this is that, instead of testing each character against the list of separators, setting a flag for next character being a start-of-word, we first confirm a match then look behind for separator. This characterization work is sometimes repeated more than once, but so far this scheme benchmarked better than alternatives we have tried to avoid doing extra work.</p>
+
+<p>Having work concentrated at hit points is also a natural fit to our logic, the most expensive part being to determine how to score similarity between characters (including context similarity). However, it also means we'll want to have some control over the number of positive hits we'll compute - that is the purpose of missed hit optimisation.</p>
+
+<h3>
+<a id="what-about-a-stack-of-needles" class="anchor" href="#what-about-a-stack-of-needles" aria-hidden="true"><span class="octicon octicon-link"></span></a>What about a stack of needles?</h3>
+
+<p>To the extent the user is searching for a specific resource, this should be uncommon.</p>
+
+<p>It can still happen in some situation such as:</p>
+
+<ul>
+<li>Search is carried as user type (the query is not intentional)</li>
+<li>The intentional query is not fully typed, match-all is a temporary step.</li>
+</ul>
+
+<p>One way to deal with that is not to use the full matching algorithm when we can deal with something simpler. This is what we have done while searching for <code>indexOf</code> instance. </p>
+
+<p>One special note: Acronym still have to be checked even if we have an exact match: for example query <code>su</code> against <code>StatusUrl</code>. As an exact match it is poor: 'Statu<strong>sU</strong>rl' is a middle of word match and have the wrong case. However as an acronym it is great: '<strong>S</strong>tatus<strong>U</strong>rl'. That motivated us to create the specialized <code>scoreAcronyms</code>.</p>
+
+<p>What is nice is that while <code>scoreAcronyms</code> was created to speed up exact matches search, it also provided very valuable information for accuracy. It later became a corner stone in the processing of accidental acronym. </p>
+
+<p>The result is that for exact matches and exact acronym matches we bypass the optimal alignment algorithm, giving very fast results.
+We still have to deal with fuzzier stacks of needles and the next two optimization address this.</p>
+
+<h3>
+<a id="hit-miss-optimization" class="anchor" href="#hit-miss-optimization" aria-hidden="true"><span class="octicon octicon-link"></span></a>Hit Miss Optimization.</h3>
+
+<p>A hit occurs when character of query is also in the subject.</p>
+
+<ul>
+<li>Every (i,j) such that subject[i] == query[j], in lowercase.</li>
+</ul>
+
+<p>A missed hit occurs when a hit does not improve the score.</p>
+
+<p>To guarantee optimal alignment, every hit has to be considered.
+However when candidate are long (deep path) &amp; query contains common use character, for example, vowels , we can spend a huge amount of time scoring accidental hits.</p>
+
+<p>So we use the number of missed hit as a heuristic for current score that are unlikely to improve. Let's score <code>itc</code> vs <code>ImportanceTableControl</code></p>
+
+<ul>
+<li>
+<code>I</code> of <code>Importance</code>: First occurrence, improve over none.</li>
+<li>
+<code>t</code> of <code>Importance</code>: First occurrence, improve over none.</li>
+<li>
+<code>c</code> of <code>Importance</code>: First occurrence, improve over none.</li>
+<li>
+<code>T</code> of <code>Table</code> : Acronym match, improve over an isolated middle of word.</li>
+<li>
+<code>C</code> of <code>Control</code> : Acronym match, improve over an isolated middle of word.</li>
+<li><p><code>t</code> of <code>Control</code>: no improvement over acronym <code>T</code>: first hit miss.</p></li>
+<li><p>After a certain threshold of missed hit we can consider it is unlikely the score will improve by much.</p></li>
+<li>Despite above example hit miss optimization do not affect scoring of exact match (sub-string or acronym)</li>
+<li><p>There are some legitimate use for hit miss, for example while scoring query <code>Mississippi</code> each positive match for <code>s</code> or <code>i</code> may trigger up to 3 hit miss on the other occurrence of that letter in query.</p></li>
+<li><p>For that reason, we propose counting consecutive hit miss and having a maximum of one hit miss per character of the subject.</p></li>
+</ul>
+
+<p><strong>Q:</strong> Does this grantee improvement over leftmost alignment?
+<strong>A:</strong> It'll often be the case but no guarantee on pathological matches.
+ For example, in query <code>abcde</code> against candidate '<strong>abc</strong>abcabcabcabcabcabczde' we may trigger the miss count before matching <code>de</code>. It'll still be registered as a match and probably a good one with <code>abc</code> at the start, <code>de</code> will be scored as optional characters not present.</p>
+
+<p>Candidate  'abcabcabcabcabcabc<strong>abcde</strong>' will not have any problem because it does not affect exact match.</p>
+
+<p>A real world example is searching <code>index</code> in the benchmark. Where <code>i</code>, <code>n</code>, <code>d</code>, <code>e</code> exist scattered in folder name, but x exist in the extension <code>.txt</code>. However, the whole point of this project is to prefer structured match to scattered one so this might not be a problem.</p>
+
+<h3>
+<a id="high-positive-count-mitigation" class="anchor" href="#high-positive-count-mitigation" aria-hidden="true"><span class="octicon octicon-link"></span></a>High Positive count mitigation</h3>
+
+<p><strong>[option <code>maxInners</code>, disabled by default]</strong></p>
+
+<p>A lot of the speed of this PR come from the idea that rejection happens often, and we need to be very efficient on them to offset slower higher quality match. Unfortunately, some query will match against almost everything.</p>
+
+<ul>
+<li>Fast short-circuit path for exact substring acronym help a lot.</li>
+<li>Missed hit heuristic also help a lot for general purpose match.</li>
+</ul>
+
+<p>However, we may still be too slow for interactive time query on large data set. This is why <code>maxInners</code> option is provided.</p>
+
+<p>This is the maximum number of positive candidate we collect before sorting and returning the list.</p>
+
+<p>The realization is that a query that match everything on a 50K item data set is unlikely to show anything useful to the user above the fold (say in the first 15 results).</p>
+
+<p>So then the priority is to detect such case of low quality (low discrimination power) query and report fast to the user so user can refine its query.</p>
+
+<p>A <code>maxInners</code> size of about 20% of the list works well. It is not needed on a smaller list.</p>
+
+<h3>
+<a id="active-region-optimization" class="anchor" href="#active-region-optimization" aria-hidden="true"><span class="octicon octicon-link"></span></a>Active Region Optimization</h3>
+
+<p>Before the first occurrence of the first char of query in the subject, or after the last occurrence of the last char of query in the subject it is impossible to make a match. So we'll trim the subject to that active region. The search for those boundaries is linear while the optimal alignment algorithm is quadratic, so it is an improvement, however, little or large we move.</p>
+
+<h3>
+<a id="benchmark" class="anchor" href="#benchmark" aria-hidden="true"><span class="octicon octicon-link"></span></a>Benchmark</h3>
+
+<ul>
+<li><p>All test compare this PR to previous version (legacy)</p></li>
+<li>
+<p>The first test <code>index</code> is a typical use case, 10% positive, 1/3 of positive are exact matches.</p>
+
+<ul>
+<li>We are about 2x faster</li>
+</ul>
+</li>
+<li><p>Second test <code>indx</code> remove exact matches. Just under 2x faster</p></li>
+<li><p>Third test <code>walkdr</code>, 1% positive, mostly testing <code>isMatch()</code>, above 2x faster.</p></li>
+<li><p>Fourth test <code>node</code>, exact match, 98% positive, bit under 2x faster.</p></li>
+<li><p>Test 5 <code>nm</code>, exact acronym match, 98% positive, about 10% slower.</p></li>
+<li><p>Test 6 <code>nodemodules</code> is special in that it use a string that score on almost every candidate, often multiple time per candidate and individuals characters are popular. It also avoid exact match speed-up. About 2x slower, but unlikely to happens in real life. <code>maxInners</code> mitigation cover that case.</p></li>
+</ul>
+
+<pre><code>Filtering 66672 entries for 'index' took 62ms for 6168 results (~10% of results are positive, mix exact &amp; fuzzy)
+Filtering 66672 entries for 'index' took 120ms for 6168 results (~10% of results are positive, Legacy method)
+======
+Filtering 66672 entries for 'indx' took 69ms for 6192 results (~10% of results are positive, Fuzzy match)
+Filtering 66672 entries for 'indx' took 126ms for 6192 results (~10% of results are positive, Fuzzy match, Legacy)
+======
+Filtering 66672 entries for 'walkdr' took 30ms for 504 results (~1% of results are positive, fuzzy)
+Filtering 66672 entries for 'walkdr' took 70ms for 504 results (~1% of results are positive, Legacy method)
+======
+Filtering 66672 entries for 'node' took 112ms for 65136 results (~98% of results are positive, mostly Exact match)
+Filtering 66672 entries for 'node' took 213ms for 65136 results (~98% of results are positive, mostly Exact match, Legacy method)
+======
+Filtering 66672 entries for 'nm' took 60ms for 65208 results (~98% of results are positive, Acronym match)
+Filtering 66672 entries for 'nm' took 56ms for 65208 results (~98% of results are positive, Acronym match, Legacy method)
+======
+Filtering 66672 entries for 'nodemodules' took 602ms for 65124 results (~98% positive + Fuzzy match, [Worst case scenario])
+Filtering 66672 entries for 'nodemodules' took 123ms for 13334 results (~98% positive + Fuzzy match, [Mitigation])
+Filtering 66672 entries for 'nodemodules' took 295ms for 65124 results (Legacy)
+</code></pre>
+
+<p><strong>Q:</strong> My results are not as good.
+<strong>A:</strong> Run the benchmark a few time, it looks like some optimization kick in later. (Or CPU on energy efficient device might need to warm up before some optimization are activated)</p>
+
+<h2>
+<a id="prior-art" class="anchor" href="#prior-art" aria-hidden="true"><span class="octicon octicon-link"></span></a>Prior Art</h2>
+
+<p><a href="https://chromium.googlesource.com/chromium/blink/+/master/Source/devtools/front_end/sources/FilePathScoreFunction.js#70">Chrome FilePathScore</a></p>
+
+<p><a href="https://github.com/textmate/textmate/blob/master/Frameworks/text/src/ranker.cc#L46">Textmate ranker</a></p>
+
+<p><a href="https://github.com/wincent/command-t/blob/master/ruby/command-t/match.c#L22">VIM Command-T </a></p>
+
+<p><a href="https://github.com/garybernhardt/selecta/blob/master/selecta#L415">Selecta</a></p>
+
+<p><a href="https://github.com/topfunky/PeepOpen/blob/master/Classes/Models/FuzzyRecord.rb">PeepOpen</a></p>
+
+<p><a href="https://github.com/lewang/flx">flx</a></p>
+
+<h2>
+<a id="list-of-addressed-issues" class="anchor" href="#list-of-addressed-issues" aria-hidden="true"><span class="octicon octicon-link"></span></a>List of addressed issues</h2>
+
+<h3>
+<a id="exact-match-vs-directory-depth" class="anchor" href="#exact-match-vs-directory-depth" aria-hidden="true"><span class="octicon octicon-link"></span></a>Exact match vs directory depth.</h3>
+
+<p><a href="https://github.com/atom/fuzzaldrin/issues/18">https://github.com/atom/fuzzaldrin/issues/18</a>
+-&gt; actionsServiceSpec</p>
+
+<p><a href="https://github.com/atom/atom/issues/7783">https://github.com/atom/atom/issues/7783</a>
+-&gt; usa_spec</p>
+
+<h3>
+<a id="start-of-string-vs-directory-depth" class="anchor" href="#start-of-string-vs-directory-depth" aria-hidden="true"><span class="octicon octicon-link"></span></a>Start of string VS directory depth</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/57#issuecomment-133531653">https://github.com/atom/fuzzy-finder/issues/57#issuecomment-133531653</a>
+-&gt; notification</p>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/21#issuecomment-48795958">https://github.com/atom/fuzzy-finder/issues/21#issuecomment-48795958</a>
+-&gt; video backbone</p>
+
+<h3>
+<a id="folder--file-query" class="anchor" href="#folder--file-query" aria-hidden="true"><span class="octicon octicon-link"></span></a>Folder / file query</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/21#issue-29106280">https://github.com/atom/fuzzy-finder/issues/21#issue-29106280</a>
+-&gt; src/app vs destroy_discard</p>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/21#issuecomment-46920333">https://github.com/atom/fuzzy-finder/issues/21#issuecomment-46920333</a>
+-&gt; email handler</p>
+
+<p><a href="https://github.com/substantial/atomfiles/issues/43">https://github.com/substantial/atomfiles/issues/43</a>
+-&gt; model user</p>
+
+<h3>
+<a id="spreadgroup-vs-directory-depth" class="anchor" href="#spreadgroup-vs-directory-depth" aria-hidden="true"><span class="octicon octicon-link"></span></a>Spread/group vs directory depth</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/21#issuecomment-138664303">https://github.com/atom/fuzzy-finder/issues/21#issuecomment-138664303</a>
+-&gt; controller core</p>
+
+<h3>
+<a id="initialism" class="anchor" href="#initialism" aria-hidden="true"><span class="octicon octicon-link"></span></a>Initialism</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/57#issue-42120886">https://github.com/atom/fuzzy-finder/issues/57#issue-42120886</a>
+-&gt; itc switch / ImportanceTableCtrl</p>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/57#issuecomment-95623924">https://github.com/atom/fuzzy-finder/issues/57#issuecomment-95623924</a>
+-&gt; application controller</p>
+
+<p><a href="https://github.com/atom/fuzzaldrin/issues/21">https://github.com/atom/fuzzaldrin/issues/21</a>
+-&gt; fft vs FilterFactorTests</p>
+
+<h3>
+<a id="accidental-acronym" class="anchor" href="#accidental-acronym" aria-hidden="true"><span class="octicon octicon-link"></span></a>Accidental Acronym</h3>
+
+<p><a href="https://github.com/atom/command-palette/issues/28">https://github.com/atom/command-palette/issues/28</a>
+-&gt; Install / Find Select All</p>
+
+<p><a href="https://github.com/atom/fuzzaldrin/issues/20#issue-93279352">https://github.com/atom/fuzzaldrin/issues/20#issue-93279352</a>
+-&gt; Git Plus Stage Hunk / Git Plus Push</p>
+
+<h3>
+<a id="case-sensitivity" class="anchor" href="#case-sensitivity" aria-hidden="true"><span class="octicon octicon-link"></span></a>Case sensitivity</h3>
+
+<p><a href="https://github.com/atom/autocomplete-plus/issues/42">https://github.com/atom/autocomplete-plus/issues/42</a>
+-&gt; downloadThread / DownloadTask</p>
+
+<p><a href="https://github.com/atom/fuzzaldrin/issues/17">https://github.com/atom/fuzzaldrin/issues/17</a>
+-&gt; diagnostics / Diagnostic</p>
+
+<h3>
+<a id="optional-characters-1" class="anchor" href="#optional-characters-1" aria-hidden="true"><span class="octicon octicon-link"></span></a>Optional Characters</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/91">https://github.com/atom/fuzzy-finder/issues/91</a>
+<a href="https://github.com/atom/fuzzaldrin/issues/24">https://github.com/atom/fuzzaldrin/issues/24</a></p>
+
+<p>-&gt; PHP Namespaces, let "\" match "/"
+-&gt; (would be nice for config file in mixed OS environment too)</p>
+
+<p><a href="https://github.com/atom/fuzzy-finder/pull/51">https://github.com/atom/fuzzy-finder/pull/51</a></p>
+
+<p>-&gt; Ruby Namespaces, let "::" match "/"</p>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/10">https://github.com/atom/fuzzy-finder/issues/10</a>
+-&gt; SpaceRegex, let " " match "/"
+-&gt; was already implemented, posted here to show parallel.</p>
+
+<h3>
+<a id="suggestions" class="anchor" href="#suggestions" aria-hidden="true"><span class="octicon octicon-link"></span></a>Suggestions</h3>
+
+<p><a href="https://github.com/atom/fuzzy-finder/issues/21#issue-29106280">https://github.com/atom/fuzzy-finder/issues/21#issue-29106280</a>
+-&gt; we implement suggestion of score based on run length
+-&gt; todo allows fuzzaldrin to support external knowledge.</p>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
