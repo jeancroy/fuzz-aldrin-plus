@@ -657,6 +657,14 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'apps_controller')).toBe candidates[1]
 
+      candidates = [
+        path.join('config', 'application.rb'),
+        path.join('app', 'controllers', 'application_controller.rb')
+      ]
+
+      expect(bestMatch(candidates, 'appcon')).toBe candidates[1]
+
+
     it "prefer path together to shorter path", ->
 
       candidates = [
