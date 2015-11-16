@@ -103,5 +103,9 @@ startTime = Date.now()
 query = 'index'
 prepared = prepQuery(query)
 match(line, query, prepared) for line in lines
-console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms")
+console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (Prepare in advance)")
 
+startTime = Date.now()
+match(line, query) for line in lines
+console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (cache)")
+# replace by `prepQuery ?= scorer.prepQuery(query)`to test without cache.
