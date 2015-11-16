@@ -29,6 +29,13 @@ describe "filtering", ->
     candidates = ["Application:Hide"]
     expect(filter(candidates, 'help')).toEqual []
 
+  it "support unicode character with different length uppercase", ->
+
+    candidates = ["Bernauer Stra\u00DFe Wall"] # Bernauer Straße Wall
+    expect(filter(candidates, 'Stra\u00DFe Wall')).toEqual candidates
+  # before correction, The map ß->SS , place the W out of sync and prevent a match.
+  # After correction we map ß->S.
+
   describe "when the maxResults option is set", ->
     it "limits the results to the result size", ->
       candidates = ['Gruntfile', 'filter', 'bile']

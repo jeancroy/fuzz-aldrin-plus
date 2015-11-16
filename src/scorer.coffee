@@ -63,7 +63,7 @@ class Query
     @query_lw = query.toLowerCase()
     @core = coreChars(query)
     @core_lw = @core.toLowerCase()
-    @core_up = @core.toUpperCase()
+    @core_up = truncatedUpperCase(@core)
     @depth = countDir(query, query.length)
 
 
@@ -499,3 +499,29 @@ exports.countDir = countDir = (path, end) ->
         continue
 
   return count
+
+#
+# Truncated Upper Case:
+# --------------------
+#
+# A fundamental mechanic is that we are able to keep uppercase and lowercase variant of the strings in sync.
+# For that we assume uppercase and lowercase version of the string have the same length
+#
+# Of course unicode being unicode there's exceptions.
+# See ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt for the list
+#
+# One common example is 'LATIN SMALL LETTER SHARP S' (U+00DF)
+# "Straße".toUpperCase() === "STRASSE" // length goes from 6 char to 7 char
+#
+# Fortunately only uppercase is touched by the exceptions.
+#
+# truncatedUpperCase("Straße") returns "STRASE"
+# iterating over every character, getting uppercase variant and getting first char of that.
+#
+# This works for isMatch because we require candidate to contain at least this string.
+# Aka second S of STRASSE is still valid, simply an optional character.
+
+truncatedUpperCase = (str) ->
+  upper = ""
+  upper += char.toUpperCase()[0] for char in str
+  return upper
