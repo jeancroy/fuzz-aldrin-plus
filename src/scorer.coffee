@@ -34,9 +34,9 @@ miss_coeff = 0.75 #Max number missed consecutive hit = ceil(miss_coeff*query.len
 # Those char improve the score if present, but will not block the match (score=0) if absent.
 
 opt_char_re = /[ _\-:\/\\]/g
-exports.coreChars = coreChars = (query) ->
-  return query.replace(opt_char_re, '')
 
+exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
+  return query.replace(optCharRegEx, '')
 
 #
 # Main export
@@ -56,13 +56,16 @@ exports.score = (string, query, prepQuery = new Query(query), allowErrors = fals
 # Query object
 #
 # Allow to reuse some quantities computed from query.
+# Optional char can optionally be specified in the form of a regular expression.
+#
+
 class Query
-  constructor: (query) ->
+  constructor: (query, optCharRegEx) ->
     return null unless query?.length
 
     @query = query
     @query_lw = query.toLowerCase()
-    @core = coreChars(query)
+    @core = coreChars(query, optCharRegEx)
     @core_lw = @core.toLowerCase()
     @core_up = truncatedUpperCase(@core)
     @depth = countDir(query, query.length)

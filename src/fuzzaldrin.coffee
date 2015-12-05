@@ -28,11 +28,11 @@ module.exports =
 # Alternatively we provide caching of prepQuery to ease direct swap of one library to another.
 #
 
-  score: (string, query, prepQuery, {allowErrors, isPath, legacy}={}) ->
+  score: (string, query, prepQuery, {allowErrors, isPath, optCharRegEx, legacy}={}) ->
     return 0 unless string?.length and query?.length
 
     # if prepQuery is given -> use it, else if prepQueryCache match the same query -> use cache, else -> compute & cache
-    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query))
+    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query, optCharRegEx))
     allowErrors ?= false
     isPath ?= true
 

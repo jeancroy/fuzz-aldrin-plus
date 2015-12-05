@@ -5,7 +5,7 @@ pluckCandidates = (a) -> a.candidate
 sortCandidates = (a, b) -> b.score - a.score
 PathSeparator = require('path').sep
 
-module.exports = (candidates, query, {key, maxResults, maxInners, allowErrors, isPath, legacy }={}) ->
+module.exports = (candidates, query, {key, maxResults, maxInners, allowErrors, isPath, optCharRegEx, legacy }={}) ->
   scoredCandidates = []
   spotLeft = if maxInners? and maxInners > 0 then maxInners else candidates.length
 
@@ -13,7 +13,7 @@ module.exports = (candidates, query, {key, maxResults, maxInners, allowErrors, i
   isPath ?= true
 
   bKey = key?
-  prepQuery = scorer.prepQuery(query)
+  prepQuery = scorer.prepQuery(query, optCharRegEx)
 
   if(not legacy)
     for candidate in candidates
