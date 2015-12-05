@@ -44,11 +44,12 @@ exports.coreChars = coreChars = (query) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, prepQuery = new Query(query), allowErrors = false) ->
+exports.score = (string, query, prepQuery = new Query(query), allowErrors = false, isPath = true) ->
   return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
   string_lw = string.toLowerCase()
   score = doScore(string, string_lw, prepQuery)
-  return Math.ceil(basenameScore(string, string_lw, prepQuery, score))
+  if isPath then score = pathScore(string, string_lw, prepQuery, score)
+  return Math.ceil(score)
 
 
 #
@@ -441,7 +442,7 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
 # Score adjustment for path
 #
 
-basenameScore = (subject, subject_lw, prepQuery, fullPathScore) ->
+pathScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   return 0 if fullPathScore is 0
 
 
