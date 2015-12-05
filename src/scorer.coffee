@@ -65,6 +65,7 @@ class Query
     @core_lw = @core.toLowerCase()
     @core_up = truncatedUpperCase(@core)
     @depth = countDir(query, query.length)
+    @ext = getExtension(@query_lw)
 
 
 exports.prepQuery = (query) ->
@@ -451,8 +452,9 @@ basenameScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   # Get position of basePath of subject.
   basePos = subject.lastIndexOf(PathSeparator, end)
 
-  #If no PathSeparator, no base path exist.
-  return fullPathScore if (basePos is -1)
+  # Get a bonus for matching extension
+  extAdjust = 1.0 + getExtensionScore(subject_lw, prepQuery.ext)
+  fullPathScore *= extAdjust
 
   # Get the number of folder in query
   depth = prepQuery.depth
@@ -466,6 +468,7 @@ basenameScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   basePos++
   end++
   basePathScore = doScore(subject[basePos...end], subject_lw[basePos...end], prepQuery)
+  basePathScore *= extAdjust
 
   # Final score is linear interpolation between base score and full path score.
   # For low directory depth, interpolation favor base Path then include more of full path as depth increase
@@ -501,6 +504,37 @@ exports.countDir = countDir = (path, end) ->
   return count
 
 #
+# Find fraction of extension that is matched by query.
+# For example mf.h prefers myFile.h to myfile.html
+# This need special handling because it give point for not having characters (the `tml` in above example)
+#
+
+getExtension = (str) ->
+  pos = str.lastIndexOf(".")
+  if pos < 0 then ""  else  str.substr(pos + 1)
+
+
+getExtensionScore = (candidate, ext) ->
+  return 0 unless ext.length
+  pos = candidate.lastIndexOf(".") + 1
+  return 0 unless pos > 1
+
+  n = ext.length
+  m = candidate.length - pos
+
+  #n contain the smallest of both extension length, m the largest.
+  if( m < n)
+    n = m
+    m = ext.length
+
+  #count number of matching characters in extension
+  matched = -1
+  while ++matched < n then break unless candidate[pos + matched] is ext[matched]
+
+  #cannot divide by zero because m is the largest and we return if either is 0
+  return  matched / m
+
+#
 # Truncated Upper Case:
 # --------------------
 #
@@ -511,11 +545,11 @@ exports.countDir = countDir = (path, end) ->
 # See ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt for the list
 #
 # One common example is 'LATIN SMALL LETTER SHARP S' (U+00DF)
-# "Straﬂe".toUpperCase() === "STRASSE" // length goes from 6 char to 7 char
+# "Stra√üe".toUpperCase() === "STRASSE" // length goes from 6 char to 7 char
 #
 # Fortunately only uppercase is touched by the exceptions.
 #
-# truncatedUpperCase("Straﬂe") returns "STRASE"
+# truncatedUpperCase("Stra√üe") returns "STRASE"
 # iterating over every character, getting uppercase variant and getting first char of that.
 #
 # This works for isMatch because we require candidate to contain at least this string.

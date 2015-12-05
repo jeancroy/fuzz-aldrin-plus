@@ -31,10 +31,10 @@ describe "filtering", ->
 
   it "support unicode character with different length uppercase", ->
 
-    candidates = ["Bernauer Stra\u00DFe Wall"] # Bernauer Stra�e Wall
+    candidates = ["Bernauer Stra\u00DFe Wall"] # Bernauer Straße Wall
     expect(filter(candidates, 'Stra\u00DFe Wall')).toEqual candidates
-  # before correction, The map �->SS , place the W out of sync and prevent a match.
-  # After correction we map �->S.
+  # before correction, The map ß->SS , place the W out of sync and prevent a match.
+  # After correction we map ß->S.
 
   describe "when the maxResults option is set", ->
     it "limits the results to the result size", ->
@@ -528,6 +528,23 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'core')).toBe candidates[1]
       expect(bestMatch(candidates, 'foo')).toBe candidates[0]
+
+    it "prefers file of the specified extension", ->
+
+      candidates = [
+        path.join('meas_astrom', 'include', 'Isst', 'meas','astrom','matchOptimisticB.h')
+        path.join('IsstDoxygen', 'html', 'match_optimistic_b_8cc.html')
+      ]
+
+      expect(bestMatch(candidates, 'mob.h')).toBe candidates[0]
+
+      candidates = [
+        path.join('matchOptimisticB.htaccess')
+        path.join('matchOptimisticB_main.html')
+      ]
+
+      expect(bestMatch(candidates, 'mob.ht')).toBe candidates[1]
+
 
     it "ignores trailing slashes", ->
 
