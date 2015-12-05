@@ -80,7 +80,7 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
   m = subject.length
   n = query_lw.length
 
-  if !m or !n or n > m
+  if !m or n > m
     return false
 
   i = -1
