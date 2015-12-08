@@ -242,7 +242,7 @@ exports.isWordStart = isWordStart = (pos, subject, subject_lw) ->
   return true if pos is 0 # match is FIRST char ( place a virtual token separator before first char of string)
   curr_s = subject[pos]
   prev_s = subject[pos - 1]
-  return isSeparator(curr_s) or isSeparator(prev_s) or # match IS or FOLLOW a separator
+  return isSeparator(prev_s) or # match FOLLOW a separator
       (  curr_s isnt subject_lw[pos] and prev_s is subject_lw[pos - 1] ) # match is Capital in camelCase (preceded by lowercase)
 
 
@@ -250,7 +250,7 @@ exports.isWordEnd = isWordEnd = (pos, subject, subject_lw, len) ->
   return true if  pos is len - 1 # last char of string
   curr_s = subject[pos]
   next_s = subject[pos + 1]
-  return isSeparator(curr_s) or isSeparator(next_s) or # match IS or IS FOLLOWED BY a separator
+  return isSeparator(next_s) or # match IS FOLLOWED BY a separator
       ( curr_s is subject_lw[pos] and next_s isnt subject_lw[pos + 1] ) # match is lowercase, followed by uppercase
 
 
@@ -404,6 +404,7 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
   return emptyAcronymResult unless m > 1 and n > 1
 
   count = 0
+  sepCount = 0
   pos = 0
   sameCase = 0
 
@@ -419,11 +420,19 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
 
       #test if subject match
       # Only record match that are also start-of-word.
-      if qj_lw is subject_lw[i] and isWordStart(i, subject, subject_lw)
-        sameCase++ if ( query[j] is subject[i] )
-        pos += i
-        count++
-        break
+      if qj_lw is subject_lw[i]
+
+        if isWordStart(i, subject, subject_lw)
+          sameCase++ if ( query[j] is subject[i] )
+          pos += i
+          count++
+          break
+
+        else if isSeparator(qj_lw)
+          #Separator get no acronym points, but register as a match in acronym prefix
+          sepCount++
+          break
+
 
     #all of subject is consumed, stop processing the query.
     if i is m then break
@@ -436,7 +445,7 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
   #Acronym are scored as start of word, but not full word
   score = scorePattern(count, n, sameCase, true, false) # wordStart = true, wordEnd = false
 
-  return new AcronymResult(score, pos / count, count)
+  return new AcronymResult(score, pos / count, count+sepCount)
 
 
 #----------------------------------------------------------------------
