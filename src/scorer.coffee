@@ -467,12 +467,15 @@ pathScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   end = subject.length - 1
   end-- while subject[end] is PathSeparator
 
-  # Get position of basePath of subject.
-  basePos = subject.lastIndexOf(PathSeparator, end)
-
   # Get a bonus for matching extension
   extAdjust = 1.0 + getExtensionScore(subject_lw, prepQuery.ext)
   fullPathScore *= extAdjust
+
+  # Get position of basePath of subject.
+  basePos = subject.lastIndexOf(PathSeparator, end)
+
+  # no basePath, nothing else to compute.
+  return fullPathScore if (basePos is -1)
 
   # Get the number of folder in query
   depth = prepQuery.depth
