@@ -202,8 +202,8 @@ doScore = (subject, subject_lw, prepQuery) ->
         start = isWordStart(i, subject, subject_lw)
 
         # Forward search for a sequence of consecutive char
-        csc_score = if csc_diag > 0  then csc_diag else scoreConsecutives(subject, subject_lw, query, query_lw, i,
-          j, start)
+        csc_score = if csc_diag > 0  then csc_diag else
+          scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start)
 
         # Determine bonus for matching A[i] with B[j]
         align = score_diag + scoreCharacter(i, j, start, acro_score, csc_score)
@@ -416,6 +416,17 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
 
     qj_lw = query_lw[j]
 
+    # Separator get no acronym points, but will not break the acronym prefix sequence either.
+    # Only need to test once per character.
+    if isSeparator(qj_lw)
+      i = subject_lw.indexOf(qj_lw, i + 1)
+      if i > -1
+        sepCount++
+        continue
+      else
+        break
+
+
     while ++i < m
 
       #test if subject match
@@ -428,12 +439,6 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
           count++
           break
 
-        else if isSeparator(qj_lw)
-          #Separator get no acronym points, but register as a match in acronym prefix
-          sepCount++
-          break
-
-
     #all of subject is consumed, stop processing the query.
     if i is m then break
 
@@ -445,7 +450,7 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
   #Acronym are scored as start of word, but not full word
   score = scorePattern(count, n, sameCase, true, false) # wordStart = true, wordEnd = false
 
-  return new AcronymResult(score, pos / count, count+sepCount)
+  return new AcronymResult(score, pos / count, count + sepCount)
 
 
 #----------------------------------------------------------------------
