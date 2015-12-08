@@ -44,7 +44,7 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, prepQuery = new Query(query), allowErrors = false, isPath = true) ->
+exports.score = (string, query, prepQuery, allowErrors, isPath) ->
   return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
   string_lw = string.toLowerCase()
   score = doScore(string, string_lw, prepQuery)
@@ -61,7 +61,7 @@ exports.score = (string, query, prepQuery = new Query(query), allowErrors = fals
 
 class Query
   constructor: (query, optCharRegEx) ->
-    return null unless query?.length
+    return null unless query and query.length
 
     @query = query
     @query_lw = query.toLowerCase()
