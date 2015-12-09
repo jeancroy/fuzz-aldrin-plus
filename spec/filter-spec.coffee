@@ -297,7 +297,7 @@ describe "filtering", ->
       expect(bestMatch(['sub_zero', 'sub-zero', 'sub zero'], 'sz')).toBe 'sub_zero'
 
 
-    it "weighs CamelCase matches higher", ->
+    it "weighs acronym matches higher than middle of word letter", ->
 
       candidates = [
         'FilterFactors.html',
@@ -430,7 +430,32 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'CCCa')).toBe candidates[0]
       expect(bestMatch(candidates, 'ccca')).toBe candidates[1]
 
+    it "prefers acronym matches that correspond to the full candidate acronym", ->
+      candidates = [
+        'JaVaScript',
+        'JavaScript'
+      ]
 
+      # <js vs JS> scores better than <js vs JVS>
+      expect(bestMatch(candidates, 'js')).toBe candidates[1]
+
+      candidates = [
+        'JSON',
+        'J.S.O.N.',
+        'JavaScript'
+      ]
+
+      # here 1:1 match outdo shorter start-of-word
+      expect(bestMatch(candidates, 'js')).toBe candidates[2]
+
+      candidates = [
+        'CSON',
+        'C.S.O.N.',
+        'CoffeeScript'
+      ]
+
+      # here 1:1 match outdo shorter start-of-word
+      expect(bestMatch(candidates, 'cs')).toBe candidates[2]
 
 
 

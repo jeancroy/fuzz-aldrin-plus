@@ -405,7 +405,7 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
 
   count = 0
   sepCount = 0
-  pos = 0
+  sumPos = 0
   sameCase = 0
 
   i = -1
@@ -416,8 +416,10 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
 
     qj_lw = query_lw[j]
 
-    # Separator get no acronym points, but will not break the acronym prefix sequence either.
-    # Only need to test once per character.
+    # Separator will not score point but will continue the prefix when present.
+    # Test that the separator is in the candidate and advance cursor to that position.
+    # If no separator break the prefix
+
     if isSeparator(qj_lw)
       i = subject_lw.indexOf(qj_lw, i + 1)
       if i > -1
@@ -426,31 +428,60 @@ exports.scoreAcronyms = scoreAcronyms = (subject, subject_lw, query, query_lw) -
       else
         break
 
+    # For other characters we search for the first match where subject[i] = query[j]
+    # that also happens to be a start-of-word
 
     while ++i < m
+      if qj_lw is subject_lw[i] and isWordStart(i, subject, subject_lw)
+        sameCase++ if ( query[j] is subject[i] )
+        sumPos += i
+        count++
+        break
 
-      #test if subject match
-      # Only record match that are also start-of-word.
-      if qj_lw is subject_lw[i]
-
-        if isWordStart(i, subject, subject_lw)
-          sameCase++ if ( query[j] is subject[i] )
-          pos += i
-          count++
-          break
-
-    #all of subject is consumed, stop processing the query.
+    # All of subject is consumed, stop processing the query.
     if i is m then break
 
-  #all of query is consumed.
-  #a single char is not an acronym (also prevent division by 0)
+
+  # Here, all of query is consumed (or we have reached a character not in acronym)
+  # A single character is not an acronym (also prevent division by 0)
   if(count < 2)
     return emptyAcronymResult
 
-  #Acronym are scored as start of word, but not full word
-  score = scorePattern(count, n, sameCase, true, false) # wordStart = true, wordEnd = false
+  # Acronym are scored as start-of-word
+  # Unless the acronym is a 1:1 match with candidate then it is upgraded to full-word.
+  fullWord = if count is n then isAcronymFullWord(subject, subject_lw, query, count) else false
+  score = scorePattern(count, n, sameCase, true, fullWord)
 
-  return new AcronymResult(score, pos / count, count + sepCount)
+  return new AcronymResult(score, sumPos / count, count + sepCount)
+
+
+#
+# Test whether there's a 1:1 relationship between query and acronym of candidate.
+# For that to happens
+# (a) All character of query must be matched to an acronym of candidate
+# (b) All acronym of candidate must be matched to a character of query.
+#
+# This method check for (b) assuming (a) has been checked before entering.
+
+isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
+  m = subject.length
+  n = query.length
+  count = 0
+
+  # Heuristic:
+  # Assume one acronym every (at most) 12 character on average
+  # This filter out long paths, but then they can match on the filename.
+  if (m > 12 * n) then return false
+
+  i = -1
+  while ++i < m
+    #For each char of subject
+    #Test if we have an acronym, if so increase acronym count.
+    #If the acronym count is more than nbAcronymInQuery (number of non separator char in query)
+    #Then we do not have 1:1 relationship.
+    if isWordStart(i, subject, subject_lw) and ++count > nbAcronymInQuery then return false
+
+  return true
 
 
 #----------------------------------------------------------------------
@@ -560,21 +591,13 @@ getExtensionScore = (candidate, ext) ->
 # --------------------
 #
 # A fundamental mechanic is that we are able to keep uppercase and lowercase variant of the strings in sync.
-# For that we assume uppercase and lowercase version of the string have the same length
-#
-# Of course unicode being unicode there's exceptions.
+# For that we assume uppercase and lowercase version of the string have the same length. Of course unicode being unicode there's exceptions.
 # See ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt for the list
 #
-# One common example is 'LATIN SMALL LETTER SHARP S' (U+00DF)
-# "Straße".toUpperCase() === "STRASSE" // length goes from 6 char to 7 char
-#
-# Fortunately only uppercase is touched by the exceptions.
-#
-# truncatedUpperCase("Straße") returns "STRASE"
+# "Straße".toUpperCase() -> "STRASSE"
+# truncatedUpperCase("Straße") -> "STRASE"
 # iterating over every character, getting uppercase variant and getting first char of that.
 #
-# This works for isMatch because we require candidate to contain at least this string.
-# Aka second S of STRASSE is still valid, simply an optional character.
 
 truncatedUpperCase = (str) ->
   upper = ""
