@@ -498,12 +498,12 @@ pathScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   end = subject.length - 1
   end-- while subject[end] is PathSeparator
 
-  # Get a bonus for matching extension
-  extAdjust = 1.0 + getExtensionScore(subject_lw, prepQuery.ext)
-  fullPathScore *= extAdjust
-
   # Get position of basePath of subject.
   basePos = subject.lastIndexOf(PathSeparator, end)
+
+  # Get a bonus for matching extension
+  extAdjust = 1.0 + getExtensionScore(subject_lw, prepQuery.ext, basePos)
+  fullPathScore *= extAdjust
 
   # no basePath, nothing else to compute.
   return fullPathScore if (basePos is -1)
@@ -566,24 +566,29 @@ getExtension = (str) ->
   if pos < 0 then ""  else  str.substr(pos + 1)
 
 
-getExtensionScore = (candidate, ext) ->
-  return 0 unless ext.length
-  pos = candidate.lastIndexOf(".") + 1
-  return 0 unless pos > 1
+getExtensionScore = (candidate, ext, basePos) ->
+  # basePos is the position of last slash of candidate, -1 if absent.
 
+  return 0 unless ext.length
+
+  # Check that (a) extension exist, (b) it is after the start of the basename
+  pos = candidate.lastIndexOf(".")
+  return 0 unless pos > basePos # (note that basePos >= -1)
+
+  pos++
   n = ext.length
   m = candidate.length - pos
 
-  #n contain the smallest of both extension length, m the largest.
+  # n contain the smallest of both extension length, m the largest.
   if( m < n)
     n = m
     m = ext.length
 
-  #count number of matching characters in extension
+  # count number of matching characters in extension
   matched = -1
-  while ++matched < n then break unless candidate[pos + matched] is ext[matched]
+  while ++matched < n then break if candidate[pos + matched] isnt ext[matched]
 
-  #cannot divide by zero because m is the largest and we return if either is 0
+  # cannot divide by zero because m is the largest extension length and we return if either is 0
   return  matched / m
 
 #
