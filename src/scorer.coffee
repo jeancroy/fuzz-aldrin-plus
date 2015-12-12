@@ -47,8 +47,8 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 exports.score = (string, query, prepQuery, allowErrors, isPath) ->
   return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
   string_lw = string.toLowerCase()
-  score = doScore(string, string_lw, prepQuery)
-  if isPath then score = pathScore(string, string_lw, prepQuery, score)
+  score = scoreMain(string, string_lw, prepQuery)
+  if isPath then score = scorePath(string, string_lw, prepQuery, score)
   return Math.ceil(score)
 
 
@@ -115,7 +115,7 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
 # Main scoring algorithm
 #
 
-doScore = (subject, subject_lw, prepQuery) ->
+scoreMain = (subject, subject_lw, prepQuery) ->
   query = prepQuery.query
   query_lw = prepQuery.query_lw
 
@@ -490,13 +490,12 @@ isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
 # Score adjustment for path
 #
 
-pathScore = (subject, subject_lw, prepQuery, fullPathScore) ->
+scorePath = (subject, subject_lw, prepQuery, fullPathScore) ->
   return 0 if fullPathScore is 0
-
 
   # Skip trailing slashes
   end = subject.length - 1
-  end-- while subject[end] is PathSeparator
+  while subject[end] is PathSeparator then end--
 
   # Get position of basePath of subject.
   basePos = subject.lastIndexOf(PathSeparator, end)
@@ -512,15 +511,13 @@ pathScore = (subject, subject_lw, prepQuery, fullPathScore) ->
   depth = prepQuery.depth
 
   # Get that many folder from subject
-  while(depth-- > 0)
+  while basePos > -1 and depth-- > 0
     basePos = subject.lastIndexOf(PathSeparator, basePos - 1)
-    if (basePos is -1) then return fullPathScore #consumed whole subject ?
 
-  # Get basePath score
-  basePos++
-  end++
-  basePathScore = doScore(subject[basePos...end], subject_lw[basePos...end], prepQuery)
-  basePathScore *= extAdjust
+  # Get basePath score, if BaseName is the whole string, no need to recompute
+  # We still need to apply the folder depth and filename penalty.
+  basePathScore = if (basePos is -1) then fullPathScore else
+    extAdjust * scoreMain(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), prepQuery)
 
   # Final score is linear interpolation between base score and full path score.
   # For low directory depth, interpolation favor base Path then include more of full path as depth increase
