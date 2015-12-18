@@ -570,6 +570,14 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'mob.ht')).toBe candidates[1]
 
+    it "support file with multiple extension", ->
+      candidates = [
+        path.join('something-foobar.class')
+        path.join('something.class.php')
+      ]
+
+      expect(bestMatch(candidates, 'some.cl')).toBe candidates[1]
+
 
     it "ignores trailing slashes", ->
 
