@@ -28,16 +28,17 @@ module.exports =
 # Alternatively we provide caching of prepQuery to ease direct swap of one library to another.
 #
 
-  score: (string, query, prepQuery, {allowErrors, isPath, optCharRegEx, legacy}={}) ->
+  score: (string, query, prepQuery, {allowErrors, isPath, useExtensionBonus, optCharRegEx, legacy}={}) ->
     return 0 unless string?.length and query?.length
 
     # if prepQuery is given -> use it, else if prepQueryCache match the same query -> use cache, else -> compute & cache
     prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query, optCharRegEx))
     allowErrors ?= false
     isPath ?= true
+    useExtensionBonus ?= true
 
     if not legacy
-      score = scorer.score(string, query, prepQuery, allowErrors, isPath)
+      score = scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus)
     else
       queryHasSlashes = prepQuery.depth > 0
       coreQuery = prepQuery.core
@@ -57,7 +58,6 @@ module.exports =
 
     return [] unless allowErrors or scorer.isMatch(string, prepQuery.core_lw, prepQuery.core_up)
     string_lw = string.toLowerCase()
-    query_lw = prepQuery.query_lw
 
     # Full path results
     matches = matcher.match(string, string_lw, prepQuery)

@@ -44,11 +44,11 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, prepQuery, allowErrors, isPath) ->
+exports.score = (string, query, prepQuery, allowErrors, isPath, useExtensionBonus) ->
   return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
   string_lw = string.toLowerCase()
   score = scoreMain(string, string_lw, prepQuery)
-  if isPath then score = scorePath(string, string_lw, prepQuery, score)
+  if isPath then score = scorePath(string, string_lw, prepQuery, score, useExtensionBonus)
   return Math.ceil(score)
 
 
@@ -162,6 +162,8 @@ scoreMain = (subject, subject_lw, prepQuery) ->
     score_row[j] = 0
     csc_row[j] = 0
 
+  #TODO: Check if speedup is important on average.
+  #This assume first and last char are correct. Possibly breaking some allowError score.
 
   # Limit the search to the active region
   # for example with query `abc`, subject `____a_bc_ac_c____`
@@ -326,7 +328,7 @@ exports.scoreCharacter = scoreCharacter = (i, j, start, acro_score, csc_score) -
 # Forward search for a sequence of consecutive character.
 #
 
-exports.scoreConsecutives = scoreConsecutives = (subject, subject_lw, query, query_lw, i, j, start) ->
+exports.scoreConsecutives = scoreConsecutives = (subject, subject_lw, query, query_lw, i, j, startOfWord) ->
   m = subject.length
   n = query.length
 
@@ -334,7 +336,6 @@ exports.scoreConsecutives = scoreConsecutives = (subject, subject_lw, query, que
   nj = n - j
   k = if mi < nj then mi else nj
 
-  startPos = i #record start position
   sameCase = 0
   sz = 0 #sz will be one more than the last qi is sj
 
@@ -351,7 +352,7 @@ exports.scoreConsecutives = scoreConsecutives = (subject, subject_lw, query, que
   # Acronym should be addressed with acronym context bonus instead of consecutive.
   return 1 + 2 * sameCase if sz is 1
 
-  return scorePattern(sz, n, sameCase, start, isWordEnd(i, subject, subject_lw, m))
+  return scorePattern(sz, n, sameCase, startOfWord, isWordEnd(i, subject, subject_lw, m))
 
 
 #
@@ -490,7 +491,7 @@ isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
 # Score adjustment for path
 #
 
-scorePath = (subject, subject_lw, prepQuery, fullPathScore) ->
+scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus) ->
   return 0 if fullPathScore is 0
 
   # Skip trailing slashes
@@ -501,8 +502,11 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore) ->
   basePos = subject.lastIndexOf(PathSeparator, end)
 
   # Get a bonus for matching extension
-  extAdjust = 1.0 + getExtensionScore(subject_lw, prepQuery.ext, basePos, end, 2)
-  fullPathScore *= extAdjust
+  extAdjust = 1.0
+
+  if useExtensionBonus
+    extAdjust += getExtensionScore(subject_lw, prepQuery.ext, basePos, end, 2)
+    fullPathScore *= extAdjust
 
   # no basePath, nothing else to compute.
   return fullPathScore if (basePos is -1)
