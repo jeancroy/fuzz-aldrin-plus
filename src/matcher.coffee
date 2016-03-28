@@ -2,18 +2,16 @@
 # This file should closely follow `scorer` except that it returns an array
 # of indexes instead of a score.
 
-PathSeparator = require('path').sep
 scorer = require './scorer'
 
-
-exports.basenameMatch = (subject, subject_lw, prepQuery) ->
+exports.basenameMatch = (subject, subject_lw, prepQuery, pathSeparator) ->
 
   # Skip trailing slashes
   end = subject.length - 1
-  end-- while subject[end] is PathSeparator
+  end-- while subject[end] is pathSeparator
 
   # Get position of basePath of subject.
-  basePos = subject.lastIndexOf(PathSeparator, end)
+  basePos = subject.lastIndexOf(pathSeparator, end)
 
   #If no PathSeparator, no base path exist.
   return [] if (basePos is -1)
@@ -23,7 +21,7 @@ exports.basenameMatch = (subject, subject_lw, prepQuery) ->
 
   # Get that many folder from subject
   while(depth-- > 0)
-    basePos = subject.lastIndexOf(PathSeparator, basePos - 1)
+    basePos = subject.lastIndexOf(pathSeparator, basePos - 1)
     return [] if (basePos is -1) #consumed whole subject ?
 
   # Get basePath match

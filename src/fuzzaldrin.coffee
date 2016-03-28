@@ -2,49 +2,41 @@ scorer = require './scorer'
 filter = require './filter'
 matcher = require './matcher'
 
-PathSeparator = require('path').sep
 prepQueryCache = null
 
 module.exports =
 
-  filter: (candidates, query, options) ->
+  filter: (candidates, query, options = {}) ->
     return [] unless query?.length and candidates?.length
+    options = parseOptions(options)
     filter(candidates, query, options)
 
-  prepQuery: (query) ->
-    scorer.prepQuery(query)
+  prepQuery: (query, options = {}) ->
+    options = parseOptions(options)
+    scorer.prepQuery(query, options)
 
-#
-# While the API is backward compatible,
-# the following pattern is recommended for speed.
-#
-# query = "..."
-# prepared = fuzzaldrin.prepQuery(query)
-# for candidate in candidates
-#    score = fuzzaldrin.score(candidate, query, prepared)
-#
-# --
-# Alternatively we provide caching of prepQuery to ease direct swap of one library to another.
-#
-
-  score: (string, query, prepQuery, {allowErrors, isPath, useExtensionBonus, optCharRegEx}={}) ->
+  score: (string, query, prepQuery, options = {}) ->
     return 0 unless string?.length and query?.length
 
+    options = parseOptions(options)
+    {allowErrors, isPath, useExtensionBonus, optCharRegEx, pathSeparator} = options
+
     # if prepQuery is given -> use it, else if prepQueryCache match the same query -> use cache, else -> compute & cache
-    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query, optCharRegEx))
-    allowErrors ?= false
-    isPath ?= true
-    useExtensionBonus ?= true
-    return scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus)
+    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query, options))
+
+    return scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator)
 
 
-  match: (string, query, prepQuery, {allowErrors}={}) ->
+  match: (string, query, prepQuery, options = {}) ->
     return [] unless string
     return [] unless query
     return [0...string.length] if string is query
 
+    options = parseOptions(options)
+    {allowErrors, isPath, useExtensionBonus, optCharRegEx, pathSeparator} = options
+
     # if prepQuery is given -> use it, else if prepQueryCache match the same query -> use cache, else -> compute & cache
-    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query))
+    prepQuery ?= if prepQueryCache and prepQueryCache.query is query then prepQueryCache else (prepQueryCache = scorer.prepQuery(query, options))
 
     return [] unless allowErrors or scorer.isMatch(string, prepQuery.core_lw, prepQuery.core_up)
     string_lw = string.toLowerCase()
@@ -56,14 +48,29 @@ module.exports =
     return matches if matches.length is 0
 
     # Is there a base path ?
-    if(string.indexOf(PathSeparator) > -1)
+    if(string.indexOf(pathSeparator) > -1)
 
       # Base path results
-      baseMatches = matcher.basenameMatch(string, string_lw, prepQuery)
+      baseMatches = matcher.basenameMatch(string, string_lw, prepQuery, pathSeparator)
 
       # Combine the results, removing duplicate indexes
       matches = matcher.mergeMatches(matches, baseMatches)
 
     matches
+
+
+parseOptions = (options) ->
+
+  options.allowErrors ?= false
+  options.isPath ?= true
+  options.useExtensionBonus ?= true
+  options.pathSeparator ?= scorer.pathSeparator
+  options.optCharRegEx ?= null
+
+  options
+
+
+
+
 
 

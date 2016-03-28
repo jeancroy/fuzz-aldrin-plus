@@ -8,7 +8,7 @@
 # Copyright (C) 2015 Jean Christophe Roy and contributors
 # MIT License: http://opensource.org/licenses/MIT
 
-PathSeparator = require('path').sep
+defaultPathSeparator = exports.pathSeparator = if process and (process.platform is "win32") then '\\' else '/'
 
 # Base point for a single character match
 # This balance making patterns VS position and size penalty.
@@ -44,11 +44,11 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, prepQuery, allowErrors, isPath, useExtensionBonus) ->
+exports.score = (string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator) ->
   return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
   string_lw = string.toLowerCase()
   score = scoreMain(string, string_lw, prepQuery)
-  if isPath then score = scorePath(string, string_lw, prepQuery, score, useExtensionBonus)
+  if isPath then score = scorePath(string, string_lw, prepQuery, score, useExtensionBonus, pathSeparator)
   return Math.ceil(score)
 
 
@@ -60,7 +60,7 @@ exports.score = (string, query, prepQuery, allowErrors, isPath, useExtensionBonu
 #
 
 class Query
-  constructor: (query, optCharRegEx) ->
+  constructor: (query, {optCharRegEx, pathSeparator} = {} ) ->
     return null unless query and query.length
 
     @query = query
@@ -68,12 +68,12 @@ class Query
     @core = coreChars(query, optCharRegEx)
     @core_lw = @core.toLowerCase()
     @core_up = truncatedUpperCase(@core)
-    @depth = countDir(query, query.length)
+    @depth = countDir(query, query.length, pathSeparator )
     @ext = getExtension(@query_lw)
 
 
-exports.prepQuery = (query) ->
-  return new Query(query)
+exports.prepQuery = (query, options) ->
+  return new Query(query, options)
 
 
 #
@@ -491,15 +491,15 @@ isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
 # Score adjustment for path
 #
 
-scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus) ->
+scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus, pathSeparator) ->
   return 0 if fullPathScore is 0
 
   # Skip trailing slashes
   end = subject.length - 1
-  while subject[end] is PathSeparator then end--
+  while subject[end] is pathSeparator then end--
 
   # Get position of basePath of subject.
-  basePos = subject.lastIndexOf(PathSeparator, end)
+  basePos = subject.lastIndexOf(pathSeparator, end)
 
   # Get a bonus for matching extension
   extAdjust = 1.0
@@ -516,7 +516,7 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus) -
 
   # Get that many folder from subject
   while basePos > -1 and depth-- > 0
-    basePos = subject.lastIndexOf(PathSeparator, basePos - 1)
+    basePos = subject.lastIndexOf(pathSeparator, basePos - 1)
 
   # Get basePath score, if BaseName is the whole string, no need to recompute
   # We still need to apply the folder depth and filename penalty.
@@ -529,7 +529,7 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus) -
   # A penalty based on the size of the basePath is applied to fullPathScore
   # That way, more focused basePath match can overcome longer directory path.
 
-  alpha = 0.5 * tau_depth / ( tau_depth + countDir(subject, end + 1) )
+  alpha = 0.5 * tau_depth / ( tau_depth + countDir(subject, end + 1, pathSeparator) )
   return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * (end - basePos))
 
 
@@ -538,20 +538,20 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus) -
 # (consecutive slashes count as a single directory)
 #
 
-exports.countDir = countDir = (path, end) ->
+exports.countDir = countDir = (path, end, pathSeparator) ->
   return 0 if end < 1
 
   count = 0
   i = -1
 
   #skip slash at the start so `foo/bar` and `/foo/bar` have the same depth.
-  while ++i < end and path[i] is PathSeparator
+  while ++i < end and path[i] is pathSeparator
     continue
 
   while ++i < end
-    if (path[i] is PathSeparator)
+    if (path[i] is pathSeparator)
       count++ #record first slash, but then skip consecutive ones
-      while ++i < end and path[i] is PathSeparator
+      while ++i < end and path[i] is pathSeparator
         continue
 
   return count
