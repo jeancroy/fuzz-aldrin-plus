@@ -1,5 +1,4 @@
 scorer = require './scorer'
-legacy_scorer = require './legacy'
 filter = require './filter'
 matcher = require './matcher'
 
@@ -28,7 +27,7 @@ module.exports =
 # Alternatively we provide caching of prepQuery to ease direct swap of one library to another.
 #
 
-  score: (string, query, prepQuery, {allowErrors, isPath, useExtensionBonus, optCharRegEx, legacy}={}) ->
+  score: (string, query, prepQuery, {allowErrors, isPath, useExtensionBonus, optCharRegEx}={}) ->
     return 0 unless string?.length and query?.length
 
     # if prepQuery is given -> use it, else if prepQueryCache match the same query -> use cache, else -> compute & cache
@@ -36,17 +35,8 @@ module.exports =
     allowErrors ?= false
     isPath ?= true
     useExtensionBonus ?= true
+    return scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus)
 
-    if not legacy
-      score = scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus)
-    else
-      queryHasSlashes = prepQuery.depth > 0
-      coreQuery = prepQuery.core
-      score = legacy_scorer.score(string, coreQuery, queryHasSlashes)
-      unless queryHasSlashes
-        score = legacy_scorer.basenameScore(string, coreQuery, score)
-
-    score
 
   match: (string, query, prepQuery, {allowErrors}={}) ->
     return [] unless string
