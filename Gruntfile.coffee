@@ -21,6 +21,28 @@ module.exports = (grunt) ->
       test: ['spec/*.coffee']
       gruntfile: ['Gruntfile.coffee']
 
+    browserify:
+
+      options:
+        banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
+
+      dist:
+        src: ['lib/fuzzaldrin.js']
+        dest: 'dist-browser/fuzzaldrin-plus.js'
+
+
+    uglify:
+
+      options:
+        preserveComments: false
+        banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
+
+      dist:
+        src: 'dist-browser/fuzzaldrin-plus.js',
+        dest: 'dist-browser/fuzzaldrin-plus.min.js'
+
+
+
     shell:
       test:
         command: 'node node_modules/jasmine-focused/bin/jasmine-focused --coffee --captureExceptions spec'
@@ -32,6 +54,9 @@ module.exports = (grunt) ->
   grunt.loadNpmTasks('grunt-contrib-coffee')
   grunt.loadNpmTasks('grunt-shell')
   grunt.loadNpmTasks('grunt-coffeelint')
+  grunt.loadNpmTasks('grunt-browserify')
+  grunt.loadNpmTasks('grunt-contrib-uglify')
+
 
   grunt.registerTask 'clean', ->
     rm = (pathToDelete) ->
@@ -40,5 +65,7 @@ module.exports = (grunt) ->
 
   grunt.registerTask('lint', ['coffeelint'])
   grunt.registerTask('test', ['default', 'shell:test'])
-  grunt.registerTask('prepublish', ['clean', 'test'])
+  grunt.registerTask('prepublish', ['clean', 'test', 'distribute'])
   grunt.registerTask('default', ['coffee', 'lint'])
+  grunt.registerTask('distribute', ['default', 'browserify', 'uglify'])
+
