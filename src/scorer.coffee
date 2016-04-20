@@ -8,7 +8,6 @@
 # Copyright (C) 2015 Jean Christophe Roy and contributors
 # MIT License: http://opensource.org/licenses/MIT
 
-defaultPathSeparator = exports.pathSeparator = if process and (process.platform is "win32") then '\\' else '/'
 
 # Base point for a single character match
 # This balance making patterns VS position and size penalty.
@@ -44,11 +43,11 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator) ->
-  return 0 unless allowErrors or isMatch(string, prepQuery.core_lw, prepQuery.core_up)
+exports.score = (string, query, preparedQuery, allowErrors, isPath, useExtensionBonus, pathSeparator) ->
+  return 0 unless allowErrors or isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)
   string_lw = string.toLowerCase()
-  score = scoreMain(string, string_lw, prepQuery)
-  if isPath then score = scorePath(string, string_lw, prepQuery, score, useExtensionBonus, pathSeparator)
+  score = scoreMain(string, string_lw, preparedQuery)
+  if isPath then score = scorePath(string, string_lw, preparedQuery, score, useExtensionBonus, pathSeparator)
   return Math.ceil(score)
 
 
@@ -72,7 +71,7 @@ class Query
     @ext = getExtension(@query_lw)
     @charCodes = getCharCodes(@query_lw)
 
-exports.prepQuery = (query, options) ->
+exports.prepareQuery = (query, options) ->
   return new Query(query, options)
 
 
@@ -115,9 +114,9 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
 # Main scoring algorithm
 #
 
-scoreMain = (subject, subject_lw, prepQuery) ->
-  query = prepQuery.query
-  query_lw = prepQuery.query_lw
+scoreMain = (subject, subject_lw, preparedQuery) ->
+  query = preparedQuery.query
+  query_lw = preparedQuery.query_lw
 
   m = subject.length
   n = query.length
@@ -505,7 +504,7 @@ isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
 # Score adjustment for path
 #
 
-scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus, pathSeparator) ->
+scorePath = (subject, subject_lw, preparedQuery, fullPathScore, useExtensionBonus, pathSeparator) ->
   return 0 if fullPathScore is 0
 
   # Skip trailing slashes
@@ -519,14 +518,14 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus, p
   extAdjust = 1.0
 
   if useExtensionBonus
-    extAdjust += getExtensionScore(subject_lw, prepQuery.ext, basePos, end, 2)
+    extAdjust += getExtensionScore(subject_lw, preparedQuery.ext, basePos, end, 2)
     fullPathScore *= extAdjust
 
   # no basePath, nothing else to compute.
   return fullPathScore if (basePos is -1)
 
   # Get the number of folder in query
-  depth = prepQuery.depth
+  depth = preparedQuery.depth
 
   # Get that many folder from subject
   while basePos > -1 and depth-- > 0
@@ -535,7 +534,7 @@ scorePath = (subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus, p
   # Get basePath score, if BaseName is the whole string, no need to recompute
   # We still need to apply the folder depth and filename penalty.
   basePathScore = if (basePos is -1) then fullPathScore else
-    extAdjust * scoreMain(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), prepQuery)
+    extAdjust * scoreMain(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery)
 
   # Final score is linear interpolation between base score and full path score.
   # For low directory depth, interpolation favor base Path then include more of full path as depth increase

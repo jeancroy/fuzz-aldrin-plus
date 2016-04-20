@@ -36,7 +36,7 @@
 <script>
 
     var global_query = "";
-    var global_candidates = "";
+    var global_candidates = [];
 
 
     //- - - - - - - - - - -
@@ -57,7 +57,7 @@
 
                 templates: {
                     suggestion: function (result) {
-                        return "<div>" + highlight(result, global_query) + "</div>"
+                        return "<div>" + fuzzaldrin.wrap(result, global_query) + "</div>"
                     }
                 }
 
@@ -82,59 +82,6 @@
         global_candidates = $("#sourcetxt").val().split("\n")
     }
 
-    //
-    // Character position to highligth wrap
-    // Something like this may become part of main library as fuzzaldrin.wrap() method
-    //
-
-    var highlight_open_tag = "<strong>";
-    var highlight_close_tag = "</strong>";
-
-    function highlight(str, query) {
-
-        var matchPositions = fuzzaldrin.match(str, query);
-        if (!matchPositions || matchPositions.length == 0) return str;
-
-        var output = "";
-        var matchIndex = -1;
-        var strPos = 0;
-
-        while (++matchIndex < matchPositions.length) {
-
-            var matchPos = matchPositions[matchIndex];
-
-            // Get text before the current match position
-            if (matchPos > strPos) {
-                output += str.substring(strPos, matchPos);
-                strPos = matchPos
-            }
-
-            // Get consecutive positions from the array
-            while (++matchIndex < matchPositions.length) {
-                if (matchPositions[matchIndex] == matchPos + 1) {
-                    matchPos++;
-                }
-                else {
-                    matchIndex--;
-                    break;
-                }
-            }
-
-            //Get text inside the match, including current
-            matchPos++;
-            if (matchPos > strPos) {
-                output += highlight_open_tag;
-                output += str.substring(strPos, matchPos);
-                output += highlight_close_tag;
-                strPos = matchPos
-            }
-
-        }
-
-        output += str.substring(strPos);
-        return output
-
-    }
 
 </script>
 

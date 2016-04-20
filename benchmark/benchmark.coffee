@@ -5,8 +5,8 @@ fuzzaldrinPlus = require '../src/fuzzaldrin'
 legacy = require 'fuzzaldrin'
 
 lines = fs.readFileSync(path.join(__dirname, 'data.txt'), 'utf8').trim().split('\n')
-forceAllMatch = {maxInners:-1}
-mitigation = {maxInners:Math.floor(0.2*lines.length)}
+forceAllMatch = {maxInners: -1}
+mitigation = {maxInners: Math.floor(0.2 * lines.length)}
 
 #warmup + compile
 fuzzaldrinPlus.filter(lines, 'index', forceAllMatch)
@@ -99,8 +99,8 @@ console.log("======")
 
 startTime = Date.now()
 query = 'index'
-prepared = fuzzaldrinPlus.prepQuery(query)
-fuzzaldrinPlus.match(line, query, prepared) for line in lines
+prepared = fuzzaldrinPlus.prepareQuery(query)
+fuzzaldrinPlus.match(line, query, {preparedQuery: prepared}) for line in lines
 console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (Prepare in advance)")
 
 startTime = Date.now()

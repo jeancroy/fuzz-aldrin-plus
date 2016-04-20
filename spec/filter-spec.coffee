@@ -1,13 +1,14 @@
 path = require 'path'
 {filter,score} = require '../src/fuzzaldrin'
 
-bestMatch = (candidates, query, {debug}={}) ->
+bestMatch = (candidates, query, options = {}) ->
 
+  {debug} = options
   if debug?
     console.log("\n = Against query: #{query} = ")
     console.log(" #{score(c, query)}: #{c}") for c in candidates
 
-  filter(candidates, query, maxResults: 1)[0]
+  filter(candidates, query, options)[0]
 
 rootPath = (segments...) ->
   joinedPath = if process.platform is 'win32' then 'C:\\' else '/'
@@ -135,7 +136,7 @@ describe "filtering", ->
 
       candidates = [
         'TODO',
-        path.join('doc','README')
+        path.join('doc', 'README')
       ]
       expect(bestMatch(candidates, 'd')).toBe candidates[1]
 
@@ -146,7 +147,6 @@ describe "filtering", ->
         'Portuges'
       ]
       expect(bestMatch(candidates, 'es')).toBe candidates[0]
-
 
 
   #---------------------------------------------------
@@ -458,7 +458,6 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'cs')).toBe candidates[2]
 
 
-
   #---------------------------------------------------
   #
   #                 Path / Fuzzy finder
@@ -501,8 +500,8 @@ describe "filtering", ->
     it "prefers matches that are together in the basename (even if basename is longer)", ->
 
       candidates = [
-        path.join('tests','buyers','orders_e2e.js'),
-        path.join('tests','buyers','users-addresses_e2e.js')
+        path.join('tests', 'buyers', 'orders_e2e.js'),
+        path.join('tests', 'buyers', 'users-addresses_e2e.js')
       ]
 
       expect(bestMatch(candidates, 'us_e2')).toBe candidates[1]
@@ -554,21 +553,21 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'core')).toBe candidates[1]
       expect(bestMatch(candidates, 'foo')).toBe candidates[0]
 
-    it "prefers file of the specified extension", ->
+    it "prefers file of the specified extension when useExtensionBonus is true ", ->
 
       candidates = [
-        path.join('meas_astrom', 'include', 'Isst', 'meas','astrom','matchOptimisticB.h')
+        path.join('meas_astrom', 'include', 'Isst', 'meas', 'astrom', 'matchOptimisticB.h')
         path.join('IsstDoxygen', 'html', 'match_optimistic_b_8cc.html')
       ]
 
-      expect(bestMatch(candidates, 'mob.h')).toBe candidates[0]
+      expect(bestMatch(candidates, 'mob.h', { useExtensionBonus: true })).toBe candidates[0]
 
       candidates = [
         path.join('matchOptimisticB.htaccess')
         path.join('matchOptimisticB_main.html')
       ]
 
-      expect(bestMatch(candidates, 'mob.ht')).toBe candidates[1]
+      expect(bestMatch(candidates, 'mob.ht', { useExtensionBonus: true })).toBe candidates[1]
 
     it "support file with multiple extension", ->
       candidates = [
@@ -576,7 +575,7 @@ describe "filtering", ->
         path.join('something.class.php')
       ]
 
-      expect(bestMatch(candidates, 'some.cl')).toBe candidates[1]
+      expect(bestMatch(candidates, 'some.cl', { useExtensionBonus: true })).toBe candidates[1]
 
 
     it "ignores trailing slashes", ->
@@ -817,13 +816,12 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, "modeluser")).toBe candidates[1]
       expect(bestMatch(candidates, "model user")).toBe candidates[1]
-      expect(bestMatch(candidates, path.join("model","user"))).toBe candidates[0]
+      expect(bestMatch(candidates, path.join("model", "user"))).toBe candidates[0]
 
   describe "when query is made only of optional characters", ->
     it "only return results having at least one specified optional character", ->
       candidates = ["bla", "_test", " test"]
       expect(filter(candidates, '_')).toEqual ['_test']
-
 
 
   #---------------------------------------------------

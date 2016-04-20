@@ -4,7 +4,7 @@
 
 scorer = require './scorer'
 
-exports.basenameMatch = (subject, subject_lw, prepQuery, pathSeparator) ->
+exports.basenameMatch = (subject, subject_lw, preparedQuery, pathSeparator) ->
 
   # Skip trailing slashes
   end = subject.length - 1
@@ -17,7 +17,7 @@ exports.basenameMatch = (subject, subject_lw, prepQuery, pathSeparator) ->
   return [] if (basePos is -1)
 
   # Get the number of folder in query
-  depth = prepQuery.depth
+  depth = preparedQuery.depth
 
   # Get that many folder from subject
   while(depth-- > 0)
@@ -27,7 +27,7 @@ exports.basenameMatch = (subject, subject_lw, prepQuery, pathSeparator) ->
   # Get basePath match
   basePos++
   end++
-  exports.match(subject[basePos ... end], subject_lw[basePos... end], prepQuery, basePos)
+  exports.match(subject[basePos ... end], subject_lw[basePos... end], preparedQuery, basePos)
 
 
 #
@@ -78,9 +78,9 @@ exports.mergeMatches = (a, b) ->
 # - no hit miss limit
 
 
-exports.match = (subject, subject_lw, prepQuery, offset = 0) ->
-  query = prepQuery.query
-  query_lw = prepQuery.query_lw
+exports.match = (subject, subject_lw, preparedQuery, offset = 0) ->
+  query = preparedQuery.query
+  query_lw = preparedQuery.query_lw
 
   m = subject.length
   n = query.length
