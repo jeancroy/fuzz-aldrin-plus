@@ -25,6 +25,8 @@ module.exports = (grunt) ->
 
       options:
         banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
+        browserifyOptions:
+          standalone: 'fuzzaldrin'
 
       dist:
         src: ['lib/fuzzaldrin.js']

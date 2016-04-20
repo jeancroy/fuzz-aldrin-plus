@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+
+
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.11.1/typeahead.jquery.min.js"></script>
+    <script src="../dist-browser/fuzzaldrin-plus.min.js"></script>
+
+    <link href="demo.css" rel="stylesheet" type="text/css"/>
+
+
+</head>
+<body>
+
+<h2>Source</h2>
+<textarea id="sourcetxt"></textarea>
+
+<div class="center">
+    <label>Enter one item per line then press update</label>
+    <button onclick="set_txt_source()"> Update source</button>
+</div>
+
+<h2>Make a search</h2>
+
+<div class="typeahead">
+    <input id="demo-query" class="twitter-typeahead" name="demo-query" autocomplete="off" type="text">
+</div>
+
+<!-- allow to scroll so autocomplete is at top of page -->
+<div style="height: 500px;"></div>
+
+
+<script>
+
+    var global_query = "";
+    var global_candidates = "";
+
+
+    //- - - - - - - - - - -
+    //   Typeahead Setup
+    // - - - - - - - - - - -
+    $('#demo-query').typeahead({
+                minLength: 2,
+                highlight: false //let FuzzySearch handle highlight
+            },
+            {
+                name: 'filtered',
+                limit: 10,
+
+                source: function (query, callback) {
+                    global_query = query;
+                    callback(fuzzaldrin.filter(global_candidates, query))
+                },
+
+                templates: {
+                    suggestion: function (result) {
+                        return "<div>" + highlight(result, global_query) + "</div>"
+                    }
+                }
+
+            });
+
+
+    // - - - - - - - - - - - -
+    //   Setup dataset
+    //- - - - - - - - - - - - -
+
+    $.ajaxSetup({cache: true});
+    function set_json_source(url) {
+        $.getJSON(url).then(function (response) {
+            global_candidates = response;
+            $("#sourcetxt").val(response.join("\n"))
+        });
+    }
+    // Load movie dataset, default options are good for list of string.
+    set_json_source("movies.json");
+
+    function set_txt_source() {
+        global_candidates = $("#sourcetxt").val().split("\n")
+    }
+
+    //
+    // Character position to highligth wrap
+    // Something like this may become part of main library as fuzzaldrin.wrap() method
+    //
+
+    var highlight_open_tag = "<strong>";
+    var highlight_close_tag = "</strong>";
+
+    function highlight(str, query) {
+
+        var matchPositions = fuzzaldrin.match(str, query);
+        if (!matchPositions || matchPositions.length == 0) return str;
+
+        var output = "";
+        var matchIndex = -1;
+        var strPos = 0;
+
+        while (++matchIndex < matchPositions.length) {
+
+            var matchPos = matchPositions[matchIndex];
+
+            // Get text before the current match position
+            if (matchPos > strPos) {
+                output += str.substring(strPos, matchPos);
+                strPos = matchPos
+            }
+
+            // Get consecutive positions from the array
+            while (++matchIndex < matchPositions.length) {
+                if (matchPositions[matchIndex] == matchPos + 1) {
+                    matchPos++;
+                }
+                else {
+                    matchIndex--;
+                    break;
+                }
+            }
+
+            //Get text inside the match, including current
+            matchPos++;
+            if (matchPos > strPos) {
+                output += highlight_open_tag;
+                output += str.substring(strPos, matchPos);
+                output += highlight_close_tag;
+                strPos = matchPos
+            }
+
+        }
+
+        output += str.substring(strPos);
+        return output
+
+    }
+
+</script>
+
+
+</body>
+</html>

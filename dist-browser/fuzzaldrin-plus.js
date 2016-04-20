@@ -1,6 +1,6 @@
 /* fuzzaldrin-plus - v0.3.1 - @license: MIT; @author: Jean Christophe Roy; @site: https://github.com/jeancroy/fuzzaldrin-plus */
 
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.fuzzaldrin = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function() {
   var defaultPathSeparator, pluckCandidates, scorer, sortCandidates;
 
@@ -18,6 +18,9 @@
 
   module.exports = function(candidates, query, options) {
     var allowErrors, bKey, candidate, isPath, key, maxInners, maxResults, optCharRegEx, pathSeparator, prepQuery, score, scoredCandidates, spotLeft, string, useExtensionBonus, _i, _len;
+    if (options == null) {
+      options = {};
+    }
     scoredCandidates = [];
     key = options.key, maxResults = options.maxResults, maxInners = options.maxInners, allowErrors = options.allowErrors, isPath = options.isPath, useExtensionBonus = options.useExtensionBonus, optCharRegEx = options.optCharRegEx, pathSeparator = options.pathSeparator;
     spotLeft = (maxInners != null) && maxInners > 0 ? maxInners : candidates.length;
@@ -64,6 +67,9 @@
 
   module.exports = {
     filter: function(candidates, query, options) {
+      if (options == null) {
+        options = {};
+      }
       if (!((query != null ? query.length : void 0) && (candidates != null ? candidates.length : void 0))) {
         return [];
       }
@@ -71,10 +77,17 @@
       return filter(candidates, query, options);
     },
     prepQuery: function(query, options) {
+      if (options == null) {
+        options = {};
+      }
+      options = parseOptions(options);
       return scorer.prepQuery(query, options);
     },
     score: function(string, query, prepQuery, options) {
       var allowErrors, isPath, optCharRegEx, pathSeparator, useExtensionBonus;
+      if (options == null) {
+        options = {};
+      }
       if (!((string != null ? string.length : void 0) && (query != null ? query.length : void 0))) {
         return 0;
       }
@@ -87,6 +100,9 @@
     },
     match: function(string, query, prepQuery, options) {
       var allowErrors, baseMatches, isPath, matches, optCharRegEx, pathSeparator, string_lw, useExtensionBonus, _i, _ref, _results;
+      if (options == null) {
+        options = {};
+      }
       if (!string) {
         return [];
       }
@@ -122,9 +138,6 @@
   };
 
   parseOptions = function(options) {
-    if (options == null) {
-      options = {};
-    }
     if (options.allowErrors == null) {
       options.allowErrors = false;
     }
@@ -844,4 +857,5 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}]},{},[2]);
+},{}]},{},[2])(2)
+});
