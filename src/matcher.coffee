@@ -4,7 +4,96 @@
 
 scorer = require './scorer'
 
-exports.basenameMatch = (subject, subject_lw, preparedQuery, pathSeparator) ->
+
+#
+# Main export
+#
+# Return position of character which matches
+
+exports.match = match = (string, query, options) ->
+
+  {allowErrors, preparedQuery, pathSeparator} = options
+
+  return [] unless allowErrors or scorer.isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)
+  string_lw = string.toLowerCase()
+
+  # Full path results
+  matches = computeMatch(string, string_lw, preparedQuery)
+
+  #if there is no matches on the full path, there should not be any on the base path either.
+  return matches if matches.length is 0
+
+  # Is there a base path ?
+  if(string.indexOf(pathSeparator) > -1)
+
+    # Base path results
+    baseMatches = basenameMatch(string, string_lw, preparedQuery, pathSeparator)
+
+    # Combine the results, removing duplicate indexes
+    matches = mergeMatches(matches, baseMatches)
+
+  matches
+
+
+#
+# Wrap
+#
+# Helper around match if you want a string with result wrapped by some delimiter text
+
+exports.wrap = (string, query, options) ->
+
+  if(options.wrap?)
+    {tagClass, tagOpen, tagClose} = options.wrap
+
+  tagClass ?= 'highlight'
+  tagOpen ?= '<strong class="' + tagClass + '">'
+  tagClose ?= '</strong>'
+
+  #Run get position where a match is found
+  matchPositions = match(string, query, options)
+
+  #If no match return as is
+  if !matchPositions or matchPositions.length == 0
+    return string
+
+  #Loop over match positions
+  output = ''
+  matchIndex = -1
+  strPos = 0
+  while ++matchIndex < matchPositions.length
+    matchPos = matchPositions[matchIndex]
+
+    # Get text before the current match position
+    if matchPos > strPos
+      output += string.substring(strPos, matchPos)
+      strPos = matchPos
+
+    # Get consecutive matches to wrap under a single tag
+    while ++matchIndex < matchPositions.length
+      if matchPositions[matchIndex] == matchPos + 1
+        matchPos++
+      else
+        matchIndex--
+        break
+
+    #Get text inside the match, including current character
+    matchPos++
+    if matchPos > strPos
+      output += tagOpen
+      output += string.substring(strPos, matchPos)
+      output += tagClose
+      strPos = matchPos
+
+  #Get string after last match
+  if(strPos < string.length - 1)
+    output += string.substring(strPos)
+
+  #return wrapped text
+  output
+
+
+
+basenameMatch = (subject, subject_lw, preparedQuery, pathSeparator) ->
 
   # Skip trailing slashes
   end = subject.length - 1
@@ -27,7 +116,7 @@ exports.basenameMatch = (subject, subject_lw, preparedQuery, pathSeparator) ->
   # Get basePath match
   basePos++
   end++
-  exports.match(subject[basePos ... end], subject_lw[basePos... end], preparedQuery, basePos)
+  computeMatch(subject[basePos ... end], subject_lw[basePos... end], preparedQuery, basePos)
 
 
 #
@@ -35,7 +124,7 @@ exports.basenameMatch = (subject, subject_lw, preparedQuery, pathSeparator) ->
 # (Assume sequences are sorted, matches are sorted by construction.)
 #
 
-exports.mergeMatches = (a, b) ->
+mergeMatches = (a, b) ->
   m = a.length
   n = b.length
 
@@ -78,7 +167,7 @@ exports.mergeMatches = (a, b) ->
 # - no hit miss limit
 
 
-exports.match = (subject, subject_lw, preparedQuery, offset = 0) ->
+computeMatch = (subject, subject_lw, preparedQuery, offset = 0) ->
   query = preparedQuery.query
   query_lw = preparedQuery.query_lw
 

@@ -507,6 +507,17 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'us_e2')).toBe candidates[1]
 
 
+      candidates = [
+        path.join('app', 'controllers', 'match_controller.rb'),
+        path.join('app', 'controllers', 'application_controller.rb')
+      ]
+
+      expect(bestMatch(candidates, 'appcontr')).toBe candidates[1]
+      expect(bestMatch(candidates, 'appcontro')).toBe candidates[1]
+      #expect(bestMatch(candidates, 'appcontrol', debug:true)).toBe candidates[1] # TODO support this case ?
+      #expect(bestMatch(candidates, 'appcontroll', debug:true)).toBe candidates[1] #Also look at issue #6
+
+
     it "allows to select using folder name", ->
 
       candidates = [

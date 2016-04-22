@@ -101,14 +101,14 @@ startTime = Date.now()
 query = 'index'
 prepared = fuzzaldrinPlus.prepareQuery(query)
 fuzzaldrinPlus.match(line, query, {preparedQuery: prepared}) for line in lines
-console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (Prepare in advance)")
+console.log("Matching #{lines.length} results for 'index' took #{Date.now() - startTime}ms (Prepare in advance)")
 
 startTime = Date.now()
 fuzzaldrinPlus.match(line, query) for line in lines
-console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (cache)")
+console.log("Matching #{lines.length} results for 'index' took #{Date.now() - startTime}ms (cache)")
 # replace by `prepQuery ?= scorer.prepQuery(query)`to test without cache.
 
 startTime = Date.now()
 legacy.match(line, query) for line in lines
-console.log("Matching #{results.length} results for 'index' took #{Date.now() - startTime}ms (legacy)")
+console.log("Matching #{lines.length} results for 'index' took #{Date.now() - startTime}ms (legacy)")
 # replace by `prepQuery ?= scorer.prepQuery(query)`to test without cache.
