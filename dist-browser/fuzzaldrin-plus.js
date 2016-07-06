@@ -308,7 +308,7 @@
 },{"./scorer":4}],4:[function(require,module,exports){
 (function (process){
 (function() {
-  var AcronymResult, Query, coreChars, countDir, defaultPathSeparator, emptyAcronymResult, file_coeff, getExtension, getExtensionScore, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, opt_char_re, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scoreMain, scorePath, scorePattern, scorePosition, scoreSize, tau_depth, tau_size, truncatedUpperCase, wm;
+  var AcronymResult, Query, coreChars, countDir, defaultPathSeparator, emptyAcronymResult, file_coeff, getCharCodes, getExtension, getExtensionScore, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, opt_char_re, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scoreMain, scorePath, scorePattern, scorePosition, scoreSize, tau_depth, tau_size, truncatedUpperCase, wm;
 
   defaultPathSeparator = exports.pathSeparator = process && (process.platform === "win32") ? '\\' : '/';
 
@@ -360,6 +360,7 @@
       this.core_up = truncatedUpperCase(this.core);
       this.depth = countDir(query, query.length, pathSeparator);
       this.ext = getExtension(this.query_lw);
+      this.charCodes = getCharCodes(this.query_lw);
     }
 
     return Query;
@@ -396,7 +397,7 @@
   };
 
   scoreMain = function(subject, subject_lw, prepQuery) {
-    var acro, acro_score, align, csc_diag, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
+    var acro, acro_score, align, csc_diag, csc_invalid, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
     query = prepQuery.query;
     query_lw = prepQuery.query_lw;
     m = subject.length;
@@ -428,12 +429,24 @@
     if (mm > i) {
       m = mm + 1;
     }
+    csc_invalid = true;
     while (++i < m) {
+      si_lw = subject_lw[i];
+      if (prepQuery.charCodes[si_lw.charCodeAt(0)] == null) {
+        if (csc_invalid !== true) {
+          j = -1;
+          while (++j < n) {
+            csc_row[j] = 0;
+          }
+          csc_invalid = true;
+        }
+        continue;
+      }
       score = 0;
       score_diag = 0;
       csc_diag = 0;
-      si_lw = subject_lw[i];
       record_miss = true;
+      csc_invalid = false;
       j = -1;
       while (++j < n) {
         score_up = score_row[j];
@@ -461,6 +474,7 @@
         score_row[j] = score;
       }
     }
+    score = score_row[n - 1];
     return score * sz;
   };
 
@@ -759,6 +773,17 @@
       upper += char.toUpperCase()[0];
     }
     return upper;
+  };
+
+  getCharCodes = function(str) {
+    var charCodes, i, len;
+    len = str.length;
+    i = -1;
+    charCodes = [];
+    while (++i < len) {
+      charCodes[str.charCodeAt(i)] = true;
+    }
+    return charCodes;
   };
 
 }).call(this);
