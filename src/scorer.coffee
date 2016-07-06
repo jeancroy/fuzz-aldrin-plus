@@ -94,13 +94,13 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
   #foreach char of query
   while ++j < n
 
-    qj_lw = query_lw[j]
-    qj_up = query_up[j]
+    qj_lw = query_lw.charCodeAt j
+    qj_up = query_up.charCodeAt j
 
     # continue walking the subject from where we have left with previous query char
     # until we have found a character that is either lowercase or uppercase query.
     while ++i < m
-      si = subject[i]
+      si = subject.charCodeAt i
       break if si is qj_lw or si is qj_up
 
     # if we passed the last char, query is not in subject
