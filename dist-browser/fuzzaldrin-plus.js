@@ -308,7 +308,7 @@
 },{"./scorer":4}],4:[function(require,module,exports){
 (function (process){
 (function() {
-  var AcronymResult, Query, coreChars, countDir, defaultPathSeparator, emptyAcronymResult, file_coeff, getExtension, getExtensionScore, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, opt_char_re, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scoreMain, scorePath, scorePattern, scorePosition, scoreSize, tau_depth, tau_size, truncatedUpperCase, wm;
+  var AcronymResult, Query, coreChars, countDir, defaultPathSeparator, emptyAcronymResult, file_coeff, getCharCodes, getExtension, getExtensionScore, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, opt_char_re, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scoreMain, scorePath, scorePattern, scorePosition, scoreSize, tau_depth, tau_size, truncatedUpperCase, wm;
 
   defaultPathSeparator = exports.pathSeparator = process && (process.platform === "win32") ? '\\' : '/';
 
@@ -360,6 +360,7 @@
       this.core_up = truncatedUpperCase(this.core);
       this.depth = countDir(query, query.length, pathSeparator);
       this.ext = getExtension(this.query_lw);
+      this.charCodes = getCharCodes(this.query_lw);
     }
 
     return Query;
@@ -380,10 +381,10 @@
     i = -1;
     j = -1;
     while (++j < n) {
-      qj_lw = query_lw[j];
-      qj_up = query_up[j];
+      qj_lw = query_lw.charCodeAt(j);
+      qj_up = query_up.charCodeAt(j);
       while (++i < m) {
-        si = subject[i];
+        si = subject.charCodeAt(i);
         if (si === qj_lw || si === qj_up) {
           break;
         }
@@ -396,7 +397,7 @@
   };
 
   scoreMain = function(subject, subject_lw, prepQuery) {
-    var acro, acro_score, align, csc_diag, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
+    var acro, acro_score, align, csc_diag, csc_invalid, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
     query = prepQuery.query;
     query_lw = prepQuery.query_lw;
     m = subject.length;
@@ -428,12 +429,24 @@
     if (mm > i) {
       m = mm + 1;
     }
+    csc_invalid = true;
     while (++i < m) {
+      si_lw = subject_lw[i];
+      if (prepQuery.charCodes[si_lw.charCodeAt(0)] == null) {
+        if (csc_invalid !== true) {
+          j = -1;
+          while (++j < n) {
+            csc_row[j] = 0;
+          }
+          csc_invalid = true;
+        }
+        continue;
+      }
       score = 0;
       score_diag = 0;
       csc_diag = 0;
-      si_lw = subject_lw[i];
       record_miss = true;
+      csc_invalid = false;
       j = -1;
       while (++j < n) {
         score_up = score_row[j];
@@ -461,6 +474,7 @@
         score_row[j] = score;
       }
     }
+    score = score_row[n - 1];
     return score * sz;
   };
 
@@ -761,6 +775,17 @@
     return upper;
   };
 
+  getCharCodes = function(str) {
+    var charCodes, i, len;
+    len = str.length;
+    i = -1;
+    charCodes = [];
+    while (++i < len) {
+      charCodes[str.charCodeAt(i)] = true;
+    }
+    return charCodes;
+  };
+
 }).call(this);
 
 }).call(this,require('_process'))
@@ -768,12 +793,40 @@
 // shim for using process in browser
 
 var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+(function () {
+  try {
+    cachedSetTimeout = setTimeout;
+  } catch (e) {
+    cachedSetTimeout = function () {
+      throw new Error('setTimeout is not defined');
+    }
+  }
+  try {
+    cachedClearTimeout = clearTimeout;
+  } catch (e) {
+    cachedClearTimeout = function () {
+      throw new Error('clearTimeout is not defined');
+    }
+  }
+} ())
 var queue = [];
 var draining = false;
 var currentQueue;
 var queueIndex = -1;
 
 function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
     draining = false;
     if (currentQueue.length) {
         queue = currentQueue.concat(queue);
@@ -789,7 +842,7 @@ function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = setTimeout(cleanUpNextTick);
+    var timeout = cachedSetTimeout(cleanUpNextTick);
     draining = true;
 
     var len = queue.length;
@@ -806,7 +859,7 @@ function drainQueue() {
     }
     currentQueue = null;
     draining = false;
-    clearTimeout(timeout);
+    cachedClearTimeout(timeout);
 }
 
 process.nextTick = function (fun) {
@@ -818,7 +871,7 @@ process.nextTick = function (fun) {
     }
     queue.push(new Item(fun, args));
     if (queue.length === 1 && !draining) {
-        setTimeout(drainQueue, 0);
+        cachedSetTimeout(drainQueue, 0);
     }
 };
 

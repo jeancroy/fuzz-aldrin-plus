@@ -70,7 +70,7 @@ class Query
     @core_up = truncatedUpperCase(@core)
     @depth = countDir(query, query.length, pathSeparator )
     @ext = getExtension(@query_lw)
-
+    @charCodes = getCharCodes(@query_lw)
 
 exports.prepQuery = (query, options) ->
   return new Query(query, options)
@@ -94,13 +94,13 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
   #foreach char of query
   while ++j < n
 
-    qj_lw = query_lw[j]
-    qj_up = query_up[j]
+    qj_lw = query_lw.charCodeAt j
+    qj_up = query_up.charCodeAt j
 
     # continue walking the subject from where we have left with previous query char
     # until we have found a character that is either lowercase or uppercase query.
     while ++i < m
-      si = subject[i]
+      si = subject.charCodeAt i
       break if si is qj_lw or si is qj_up
 
     # if we passed the last char, query is not in subject
@@ -178,13 +178,26 @@ scoreMain = (subject, subject_lw, prepQuery) ->
   mm = subject_lw.lastIndexOf(query_lw[n - 1], m)
   if(mm > i) then m = mm + 1
 
+  csc_invalid = true
+
   while ++i < m     #foreach char si of subject
+    si_lw = subject_lw[i]
+
+    # if si_lw is not in query
+    if not prepQuery.charCodes[si_lw.charCodeAt 0]?
+      # reset csc_row and move to next
+      if csc_invalid isnt true
+        j = -1
+        while ++j < n
+          csc_row[j] = 0
+        csc_invalid = true
+      continue
 
     score = 0
     score_diag = 0
     csc_diag = 0
-    si_lw = subject_lw[i]
     record_miss = true
+    csc_invalid = false
 
     j = -1 #0..n-1
     while ++j < n   #foreach char qj of query
@@ -230,7 +243,8 @@ scoreMain = (subject, subject_lw, prepQuery) ->
       csc_row[j] = csc_score
       score_row[j] = score
 
-
+  # get hightest score so far
+  score = score_row[n - 1]
   return score * sz
 
 #
@@ -613,3 +627,21 @@ truncatedUpperCase = (str) ->
   upper = ""
   upper += char.toUpperCase()[0] for char in str
   return upper
+
+#
+# Get character codes:
+# --------------------
+#
+# Get character codes map for a given string
+#
+
+getCharCodes = (str) ->
+  len = str.length
+  i = -1
+
+  charCodes = []
+  # create map
+  while ++i < len
+    charCodes[str.charCodeAt i] = true
+
+  return charCodes
