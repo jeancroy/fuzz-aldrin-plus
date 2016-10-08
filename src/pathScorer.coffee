@@ -34,6 +34,7 @@ scorePath = (subject, subject_lw, fullPathScore, options) ->
 
   # Get position of basePath of subject.
   basePos = subject.lastIndexOf(pathSeparator, end)
+  fileLength = end-basePos
 
   # Get a bonus for matching extension
   extAdjust = 1.0
@@ -64,7 +65,7 @@ scorePath = (subject, subject_lw, fullPathScore, options) ->
   # That way, more focused basePath match can overcome longer directory path.
 
   alpha = 0.5 * tau_depth / ( tau_depth + countDir(subject, end + 1, pathSeparator) )
-  return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * (end - basePos))
+  return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * (fileLength))
 
 
 #

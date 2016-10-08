@@ -514,8 +514,8 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'appcontr')).toBe candidates[1]
       expect(bestMatch(candidates, 'appcontro')).toBe candidates[1]
-      #expect(bestMatch(candidates, 'appcontrol', debug:true)).toBe candidates[1] # TODO support this case ?
-      #expect(bestMatch(candidates, 'appcontroll', debug:true)).toBe candidates[1] #Also look at issue #6
+    #expect(bestMatch(candidates, 'appcontrol', debug:true)).toBe candidates[1] # TODO support this case ?
+    #expect(bestMatch(candidates, 'appcontroll', debug:true)).toBe candidates[1] #Also look at issue #6
 
 
     it "allows to select using folder name", ->
@@ -571,14 +571,14 @@ describe "filtering", ->
         path.join('IsstDoxygen', 'html', 'match_optimistic_b_8cc.html')
       ]
 
-      expect(bestMatch(candidates, 'mob.h', { useExtensionBonus: true })).toBe candidates[0]
+      expect(bestMatch(candidates, 'mob.h', {useExtensionBonus: true})).toBe candidates[0]
 
       candidates = [
         path.join('matchOptimisticB.htaccess')
         path.join('matchOptimisticB_main.html')
       ]
 
-      expect(bestMatch(candidates, 'mob.ht', { useExtensionBonus: true })).toBe candidates[1]
+      expect(bestMatch(candidates, 'mob.ht', {useExtensionBonus: true})).toBe candidates[1]
 
     it "support file with multiple extension", ->
       candidates = [
@@ -586,7 +586,7 @@ describe "filtering", ->
         path.join('something.class.php')
       ]
 
-      expect(bestMatch(candidates, 'some.cl', { useExtensionBonus: true })).toBe candidates[1]
+      expect(bestMatch(candidates, 'some.cl', {useExtensionBonus: true})).toBe candidates[1]
 
 
     it "ignores trailing slashes", ->
@@ -616,6 +616,29 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'project file')).toBe candidates[0]
       expect(bestMatch(candidates, path.join('project', 'file'))).toBe candidates[1]
 
+    it "prefers overall better match to shorter end-of-path length", ->
+
+      candidates = [
+
+        path.join('CommonControl', 'Controls', 'Shared')
+        path.join('CommonControl', 'Controls', 'Shared', 'Mouse')
+        path.join('CommonControl', 'Controls', 'Shared', 'Keyboard')
+        path.join('CommonControl', 'Controls', 'Shared', 'Keyboard', 'cc.js')
+
+      ]
+
+      expect(bestMatch(candidates, path.join('CC','Controls','Shared'))).toBe candidates[0]
+      expect(bestMatch(candidates, 'CC Controls Shared')).toBe candidates[0]
+
+
+      expect(bestMatch(candidates, 'CCCShared')).toBe candidates[0]
+      expect(bestMatch(candidates, 'ccc shared')).toBe candidates[0]
+      expect(bestMatch(candidates, 'cc c shared')).toBe candidates[0]
+
+      expect(bestMatch(candidates, path.join('ccc','shared'))).toBe candidates[0]
+      expect(bestMatch(candidates, path.join('cc','c','shared'))).toBe candidates[0]
+
+
 
   describe "when the entries are of differing directory depths", ->
 
@@ -644,8 +667,8 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, "file")).toBe candidates[0]
 
-      # We have plenty of report on how this or that should win because file is a better basename match
-      # But we have no report of searching too deep, because of that folder-depth penalty is pretty weak.
+    # We have plenty of report on how this or that should win because file is a better basename match
+    # But we have no report of searching too deep, because of that folder-depth penalty is pretty weak.
 
 
     it "allows better basename match to overcome slightly deeper directory / longer overall path", ->
@@ -869,13 +892,13 @@ describe "filtering", ->
       expect(result[3]).toBe candidates[1]
       expect(result[4]).toBe candidates[0]
 
-      # for this one, complete word "Install" should win against:
-      #
-      #  - case-sensitive end-of-word match "Uninstall",
-      #  - start of word match "Installed",
-      #  - double acronym match "in S t A ll" -> "Select All"
-      #
-      #  also "Install" by itself should win against "Install" in a sentence
+    # for this one, complete word "Install" should win against:
+    #
+    #  - case-sensitive end-of-word match "Uninstall",
+    #  - start of word match "Installed",
+    #  - double acronym match "in S t A ll" -> "Select All"
+    #
+    #  also "Install" by itself should win against "Install" in a sentence
 
 
     it "weighs substring higher than individual characters", ->
@@ -890,6 +913,6 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'git push')).toBe candidates[2]
       expect(bestMatch(candidates, 'gpush')).toBe candidates[2]
 
-      # Here "Plus Stage Hunk" accidentally match acronym on PuSH.
-      # Using two words disable exactMatch bonus, we have to rely on consecutive match
+# Here "Plus Stage Hunk" accidentally match acronym on PuSH.
+# Using two words disable exactMatch bonus, we have to rely on consecutive match
 
