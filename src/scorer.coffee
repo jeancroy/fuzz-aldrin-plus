@@ -15,9 +15,7 @@ wm = 150
 
 #Fading function
 pos_bonus = 20 # The character from 0..pos_bonus receive a greater bonus for being at the start of string.
-tau_depth = 13 # Directory depth at which the full path influence is halved.
 tau_size = 85 # Full path length at which the whole match score is halved.
-file_coeff = 1.2 # Full path is also penalized for length of basename. This adjust a scale factor for that penalty.
 
 # Miss count
 # When subject[i] is query[j] we register a hit.
@@ -28,14 +26,6 @@ file_coeff = 1.2 # Full path is also penalized for length of basename. This adju
 # This has a direct influence on worst case scenario benchmark.
 miss_coeff = 0.75 #Max number missed consecutive hit = ceil(miss_coeff*query.length) + 5
 
-#
-# Optional chars
-# Those char improve the score if present, but will not block the match (score=0) if absent.
-
-opt_char_re = /[ _\-:\/\\]/g
-
-exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
-  return query.replace(optCharRegEx, '')
 
 #
 # Main export
@@ -43,36 +33,12 @@ exports.coreChars = coreChars = (query, optCharRegEx = opt_char_re) ->
 # Manage the logic of testing if there's a match and calling the main scoring function
 # Also manage scoring a path and optional character.
 
-exports.score = (string, query, preparedQuery, allowErrors, isPath, useExtensionBonus, pathSeparator) ->
+exports.score = (string, query, options) ->
+  {preparedQuery, allowErrors} = options
   return 0 unless allowErrors or isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)
   string_lw = string.toLowerCase()
-  score = scoreMain(string, string_lw, preparedQuery)
-  if isPath then score = scorePath(string, string_lw, preparedQuery, score, useExtensionBonus, pathSeparator)
+  score = computeScore(string, string_lw, preparedQuery)
   return Math.ceil(score)
-
-
-#
-# Query object
-#
-# Allow to reuse some quantities computed from query.
-# Optional char can optionally be specified in the form of a regular expression.
-#
-
-class Query
-  constructor: (query, {optCharRegEx, pathSeparator} = {} ) ->
-    return null unless query and query.length
-
-    @query = query
-    @query_lw = query.toLowerCase()
-    @core = coreChars(query, optCharRegEx)
-    @core_lw = @core.toLowerCase()
-    @core_up = truncatedUpperCase(@core)
-    @depth = countDir(query, query.length, pathSeparator )
-    @ext = getExtension(@query_lw)
-    @charCodes = getCharCodes(@query_lw)
-
-exports.prepareQuery = (query, options) ->
-  return new Query(query, options)
 
 
 #
@@ -114,7 +80,7 @@ exports.isMatch = isMatch = (subject, query_lw, query_up) ->
 # Main scoring algorithm
 #
 
-scoreMain = (subject, subject_lw, preparedQuery) ->
+exports.computeScore = computeScore = (subject, subject_lw, preparedQuery) ->
   query = preparedQuery.query
   query_lw = preparedQuery.query_lw
 
@@ -183,7 +149,7 @@ scoreMain = (subject, subject_lw, preparedQuery) ->
     si_lw = subject_lw[i]
 
     # if si_lw is not in query
-    if not prepQuery.charCodes[si_lw.charCodeAt 0]?
+    if not preparedQuery.charCodes[si_lw.charCodeAt 0]?
       # reset csc_row and move to next
       if csc_invalid isnt true
         j = -1
@@ -283,7 +249,7 @@ scorePosition = (pos) ->
   else
     return Math.max(100 + pos_bonus - pos, 0)
 
-scoreSize = (n, m) ->
+exports.scoreSize = scoreSize = (n, m) ->
   # Size penalty, use the difference of size (m-n)
   return tau_size / ( tau_size + Math.abs(m - n))
 
@@ -496,151 +462,3 @@ isAcronymFullWord = (subject, subject_lw, query, nbAcronymInQuery) ->
     if isWordStart(i, subject, subject_lw) and ++count > nbAcronymInQuery then return false
 
   return true
-
-
-#----------------------------------------------------------------------
-
-#
-# Score adjustment for path
-#
-
-scorePath = (subject, subject_lw, preparedQuery, fullPathScore, useExtensionBonus, pathSeparator) ->
-  return 0 if fullPathScore is 0
-
-  # Skip trailing slashes
-  end = subject.length - 1
-  while subject[end] is pathSeparator then end--
-
-  # Get position of basePath of subject.
-  basePos = subject.lastIndexOf(pathSeparator, end)
-
-  # Get a bonus for matching extension
-  extAdjust = 1.0
-
-  if useExtensionBonus
-    extAdjust += getExtensionScore(subject_lw, preparedQuery.ext, basePos, end, 2)
-    fullPathScore *= extAdjust
-
-  # no basePath, nothing else to compute.
-  return fullPathScore if (basePos is -1)
-
-  # Get the number of folder in query
-  depth = preparedQuery.depth
-
-  # Get that many folder from subject
-  while basePos > -1 and depth-- > 0
-    basePos = subject.lastIndexOf(pathSeparator, basePos - 1)
-
-  # Get basePath score, if BaseName is the whole string, no need to recompute
-  # We still need to apply the folder depth and filename penalty.
-  basePathScore = if (basePos is -1) then fullPathScore else
-    extAdjust * scoreMain(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery)
-
-  # Final score is linear interpolation between base score and full path score.
-  # For low directory depth, interpolation favor base Path then include more of full path as depth increase
-  #
-  # A penalty based on the size of the basePath is applied to fullPathScore
-  # That way, more focused basePath match can overcome longer directory path.
-
-  alpha = 0.5 * tau_depth / ( tau_depth + countDir(subject, end + 1, pathSeparator) )
-  return  alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * (end - basePos))
-
-
-#
-# Count number of folder in a path.
-# (consecutive slashes count as a single directory)
-#
-
-exports.countDir = countDir = (path, end, pathSeparator) ->
-  return 0 if end < 1
-
-  count = 0
-  i = -1
-
-  #skip slash at the start so `foo/bar` and `/foo/bar` have the same depth.
-  while ++i < end and path[i] is pathSeparator
-    continue
-
-  while ++i < end
-    if (path[i] is pathSeparator)
-      count++ #record first slash, but then skip consecutive ones
-      while ++i < end and path[i] is pathSeparator
-        continue
-
-  return count
-
-#
-# Find fraction of extension that is matched by query.
-# For example mf.h prefers myFile.h to myfile.html
-# This need special handling because it give point for not having characters (the `tml` in above example)
-#
-
-getExtension = (str) ->
-  pos = str.lastIndexOf(".")
-  if pos < 0 then ""  else  str.substr(pos + 1)
-
-
-getExtensionScore = (candidate, ext, startPos, endPos, maxDepth) ->
-  # startPos is the position of last slash of candidate, -1 if absent.
-
-  return 0 unless ext.length
-
-  # Check that (a) extension exist, (b) it is after the start of the basename
-  pos = candidate.lastIndexOf(".", endPos)
-  return 0 unless pos > startPos # (note that startPos >= -1)
-
-  n = ext.length
-  m = endPos - pos
-
-  # n contain the smallest of both extension length, m the largest.
-  if( m < n)
-    n = m
-    m = ext.length
-
-  #place cursor after dot & count number of matching characters in extension
-  pos++
-  matched = -1
-  while ++matched < n then break if candidate[pos + matched] isnt ext[matched]
-
-  # if nothing found, try deeper for multiple extensions, with some penalty for depth
-  if matched is 0 and maxDepth > 0
-    return 0.9 * getExtensionScore(candidate, ext, startPos, pos - 2, maxDepth - 1)
-
-  # cannot divide by zero because m is the largest extension length and we return if either is 0
-  return  matched / m
-
-#
-# Truncated Upper Case:
-# --------------------
-#
-# A fundamental mechanic is that we are able to keep uppercase and lowercase variant of the strings in sync.
-# For that we assume uppercase and lowercase version of the string have the same length. Of course unicode being unicode there's exceptions.
-# See ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt for the list
-#
-# "Straße".toUpperCase() -> "STRASSE"
-# truncatedUpperCase("Straße") -> "STRASE"
-# iterating over every character, getting uppercase variant and getting first char of that.
-#
-
-truncatedUpperCase = (str) ->
-  upper = ""
-  upper += char.toUpperCase()[0] for char in str
-  return upper
-
-#
-# Get character codes:
-# --------------------
-#
-# Get character codes map for a given string
-#
-
-getCharCodes = (str) ->
-  len = str.length
-  i = -1
-
-  charCodes = []
-  # create map
-  while ++i < len
-    charCodes[str.charCodeAt i] = true
-
-  return charCodes

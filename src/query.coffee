@@ -8,17 +8,19 @@
 {countDir, getExtension} = require "./pathScorer"
 
 module.exports =
-  class Query
-    constructor: (query, {optCharRegEx, pathSeparator} = {} ) ->
-      return null unless query and query.length
 
-      @query = query
-      @query_lw = query.toLowerCase()
-      @core = coreChars(query, optCharRegEx)
-      @core_lw = @core.toLowerCase()
-      @core_up = truncatedUpperCase(@core)
-      @depth = countDir(query, query.length, pathSeparator )
-      @ext = getExtension(@query_lw)
+class Query
+  constructor: (query, {optCharRegEx, pathSeparator} = {} ) ->
+    return null unless query and query.length
+
+    @query = query
+    @query_lw = query.toLowerCase()
+    @core = coreChars(query, optCharRegEx)
+    @core_lw = @core.toLowerCase()
+    @core_up = truncatedUpperCase(@core)
+    @depth = countDir(query, query.length, pathSeparator )
+    @ext = getExtension(@query_lw)
+    @charCodes = getCharCodes(@query_lw)
 
 
 #
@@ -47,3 +49,21 @@ truncatedUpperCase = (str) ->
   upper = ""
   upper += char.toUpperCase()[0] for char in str
   return upper
+
+#
+# Get character codes:
+# --------------------
+#
+# Get character codes map for a given string
+#
+
+getCharCodes = (str) ->
+  len = str.length
+  i = -1
+
+  charCodes = []
+  # create map
+  while ++i < len
+    charCodes[str.charCodeAt i] = true
+
+  return charCodes

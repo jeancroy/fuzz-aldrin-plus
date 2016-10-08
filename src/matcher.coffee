@@ -2,8 +2,7 @@
 # This file should closely follow `scorer` except that it returns an array
 # of indexes instead of a score.
 
-scorer = require './scorer'
-
+{isMatch, isWordStart, scoreConsecutives, scoreCharacter, scoreAcronyms} = require './scorer'
 
 #
 # Main export
@@ -14,7 +13,7 @@ exports.match = match = (string, query, options) ->
 
   {allowErrors, preparedQuery, pathSeparator} = options
 
-  return [] unless allowErrors or scorer.isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)
+  return [] unless allowErrors or isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)
   string_lw = string.toLowerCase()
 
   # Full path results
@@ -49,11 +48,14 @@ exports.wrap = (string, query, options) ->
   tagOpen ?= '<strong class="' + tagClass + '">'
   tagClose ?= '</strong>'
 
+  if string == query
+    return tagOpen + string + tagClose
+
   #Run get position where a match is found
   matchPositions = match(string, query, options)
 
   #If no match return as is
-  if !matchPositions or matchPositions.length == 0
+  if matchPositions.length == 0
     return string
 
   #Loop over match positions
@@ -157,7 +159,7 @@ mergeMatches = (a, b) ->
 # Align sequence (used for fuzzaldrin.match)
 # Return position of subject characters that match query.
 #
-# Follow closely scorer.doScore.
+# Follow closely scorer.computeScore.
 # Except at each step we record what triggered the best score.
 # Then we trace back to output matched characters.
 #
@@ -175,7 +177,7 @@ computeMatch = (subject, subject_lw, preparedQuery, offset = 0) ->
   n = query.length
 
   #this is like the consecutive bonus, but for camelCase / snake_case initials
-  acro_score = scorer.scoreAcronyms(subject, subject_lw, query, query_lw).score
+  acro_score = scoreAcronyms(subject, subject_lw, query, query_lw).score
 
   #Init
   score_row = new Array(n)
@@ -216,14 +218,14 @@ computeMatch = (subject, subject_lw, preparedQuery, offset = 0) ->
       #Compute a tentative match
       if ( query_lw[j] is si_lw )
 
-        start = scorer.isWordStart(i, subject, subject_lw)
+        start = isWordStart(i, subject, subject_lw)
 
         # Forward search for a sequence of consecutive char
         csc_score = if csc_diag > 0  then csc_diag else
-          scorer.scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start)
+          scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start)
 
         # Determine bonus for matching A[i] with B[j]
-        align = score_diag + scorer.scoreCharacter(i, j, start, acro_score, csc_score)
+        align = score_diag + scoreCharacter(i, j, start, acro_score, csc_score)
 
       #Prepare next sequence & match score.
       score_up = score_row[j] # Current score_up is next run score diag
