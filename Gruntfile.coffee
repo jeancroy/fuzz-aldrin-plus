@@ -28,15 +28,15 @@ module.exports = (grunt) ->
           standalone: 'fuzzaldrin'
       dist:
         src: ['lib/fuzzaldrin.js']
-        dest: 'dist-browser/latest/fuzzaldrin-plus.js'
+        dest: 'dist-browser/fuzzaldrin-plus.js'
 
     uglify:
       options:
         preserveComments: false
         banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
       dist:
-        src: 'dist-browser/latest/fuzzaldrin-plus.js',
-        dest: 'dist-browser/latest/fuzzaldrin-plus.min.js'
+        src: 'dist-browser/fuzzaldrin-plus.js',
+        dest: 'dist-browser/fuzzaldrin-plus.min.js'
 
     shell:
       test:
@@ -54,6 +54,7 @@ module.exports = (grunt) ->
     nugetpack:
       options:
         properties:'versiondir=<%= pkg.version %>'
+        verbosity: 'detailed'
       dist:
         src: 'fuzzaldrin-plus.nuspec'
         dest: 'dist/'
