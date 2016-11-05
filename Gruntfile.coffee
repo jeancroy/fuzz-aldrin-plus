@@ -1,7 +1,7 @@
 module.exports = (grunt) ->
   grunt.initConfig
     pkg: grunt.file.readJSON('package.json')
-
+    clean: ['lib','dist']
     coffee:
       glob_to_multiple:
         expand: true
@@ -52,22 +52,39 @@ module.exports = (grunt) ->
           stdout: true
           stderr: true
           failOnError: true
+      mkdir:
+        command: 'mkdir dist'
+        options:
+          stdout: true
+          stderr: true
+          failOnError: true
 
+
+    nugetpack:
+      dist:
+        src: 'fuzzaldrin-plus.nuspec'
+        dest: 'dist/'
+        options:
+          version: '<%= pkg.version %>'
+
+    nugetpush:
+      dist:
+        src: 'dist/*.nupkg'
+      options:
+        apiKey: '<specify API key before executing nugetpush task>'
+          
   grunt.loadNpmTasks('grunt-contrib-coffee')
   grunt.loadNpmTasks('grunt-shell')
   grunt.loadNpmTasks('grunt-coffeelint')
   grunt.loadNpmTasks('grunt-browserify')
   grunt.loadNpmTasks('grunt-contrib-uglify')
-
-
-  grunt.registerTask 'clean', ->
-    rm = (pathToDelete) ->
-      grunt.file.delete(pathToDelete) if grunt.file.exists(pathToDelete)
-    rm('lib')
+  grunt.loadNpmTasks('grunt-contrib-clean')
+  grunt.loadNpmTasks('grunt-nuget')
 
   grunt.registerTask('lint', ['coffeelint'])
   grunt.registerTask('test', ['default', 'shell:test'])
   grunt.registerTask('prepublish', ['clean', 'test', 'distribute'])
   grunt.registerTask('default', ['coffee', 'lint'])
   grunt.registerTask('distribute', ['default', 'browserify', 'uglify'])
-
+  grunt.registerTask('packnuget', ['shell:mkdir', 'nugetpack'])
+  grunt.registerTask('publishnuget', ['packnuget', 'nugetpush'])
