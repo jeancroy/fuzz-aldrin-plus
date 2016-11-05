@@ -22,28 +22,21 @@ module.exports = (grunt) ->
       gruntfile: ['Gruntfile.coffee']
 
     browserify:
-
       options:
         banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
         browserifyOptions:
           standalone: 'fuzzaldrin'
-
       dist:
         src: ['lib/fuzzaldrin.js']
         dest: 'dist-browser/fuzzaldrin-plus.js'
 
-
     uglify:
-
       options:
         preserveComments: false
         banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
-
       dist:
         src: 'dist-browser/fuzzaldrin-plus.js',
         dest: 'dist-browser/fuzzaldrin-plus.min.js'
-
-
 
     shell:
       test:
@@ -59,7 +52,6 @@ module.exports = (grunt) ->
           stderr: true
           failOnError: true
 
-
     nugetpack:
       dist:
         src: 'fuzzaldrin-plus.nuspec'
@@ -70,8 +62,8 @@ module.exports = (grunt) ->
     nugetpush:
       dist:
         src: 'dist/*.nupkg'
-      options:
-        apiKey: '<specify API key before executing nugetpush task>'
+        options:
+          apiKey: '<specify API key before executing nugetpush task>'
           
   grunt.loadNpmTasks('grunt-contrib-coffee')
   grunt.loadNpmTasks('grunt-shell')
