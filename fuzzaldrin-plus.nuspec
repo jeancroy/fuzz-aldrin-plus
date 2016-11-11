@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>Fuzzladrin-Plus</id>
+    <id>Fuzzaldrin-Plus</id>
     <version>0.0</version> <!-- use version from package.json -->
     <authors>Jean Christophe Roy</authors>
     <owners>Jean Christophe Roy</owners>
