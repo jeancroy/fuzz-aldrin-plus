@@ -2,11 +2,13 @@
 
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.fuzzaldrin = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function() {
-  var defaultPathSeparator, pluckCandidates, scorer, sortCandidates;
+  var Query, pathScorer, pluckCandidates, scorer, sortCandidates;
 
   scorer = require('./scorer');
 
-  defaultPathSeparator = scorer.pathSeparator;
+  pathScorer = require('./pathScorer');
+
+  Query = require('./query');
 
   pluckCandidates = function(a) {
     return a.candidate;
@@ -17,22 +19,19 @@
   };
 
   module.exports = function(candidates, query, options) {
-    var allowErrors, bKey, candidate, isPath, key, maxInners, maxResults, optCharRegEx, pathSeparator, prepQuery, score, scoredCandidates, spotLeft, string, useExtensionBonus, _i, _len;
-    if (options == null) {
-      options = {};
-    }
+    var bKey, candidate, key, maxInners, maxResults, score, scoreProvider, scoredCandidates, spotLeft, string, usePathScoring, _i, _len;
     scoredCandidates = [];
-    key = options.key, maxResults = options.maxResults, maxInners = options.maxInners, allowErrors = options.allowErrors, isPath = options.isPath, useExtensionBonus = options.useExtensionBonus, optCharRegEx = options.optCharRegEx, pathSeparator = options.pathSeparator;
-    spotLeft = (maxInners != null) && maxInners > 0 ? maxInners : candidates.length;
+    key = options.key, maxResults = options.maxResults, maxInners = options.maxInners, usePathScoring = options.usePathScoring;
+    spotLeft = (maxInners != null) && maxInners > 0 ? maxInners : candidates.length + 1;
     bKey = key != null;
-    prepQuery = scorer.prepQuery(query, options);
+    scoreProvider = usePathScoring ? pathScorer : scorer;
     for (_i = 0, _len = candidates.length; _i < _len; _i++) {
       candidate = candidates[_i];
       string = bKey ? candidate[key] : candidate;
       if (!string) {
         continue;
       }
-      score = scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator);
+      score = scoreProvider.score(string, query, options);
       if (score > 0) {
         scoredCandidates.push({
           candidate: candidate,
@@ -53,17 +52,24 @@
 
 }).call(this);
 
-},{"./scorer":4}],2:[function(require,module,exports){
+},{"./pathScorer":4,"./query":5,"./scorer":6}],2:[function(require,module,exports){
+(function (process){
 (function() {
-  var filter, matcher, parseOptions, prepQueryCache, scorer;
-
-  scorer = require('./scorer');
+  var Query, defaultPathSeparator, filter, matcher, parseOptions, pathScorer, preparedQueryCache, scorer;
 
   filter = require('./filter');
 
   matcher = require('./matcher');
 
-  prepQueryCache = null;
+  scorer = require('./scorer');
+
+  pathScorer = require('./pathScorer');
+
+  Query = require('./query');
+
+  preparedQueryCache = null;
+
+  defaultPathSeparator = (typeof process !== "undefined" && process !== null ? process.platform : void 0) === "win32" ? '\\' : '/';
 
   module.exports = {
     filter: function(candidates, query, options) {
@@ -73,33 +79,25 @@
       if (!((query != null ? query.length : void 0) && (candidates != null ? candidates.length : void 0))) {
         return [];
       }
-      options = parseOptions(options);
+      options = parseOptions(options, query);
       return filter(candidates, query, options);
     },
-    prepQuery: function(query, options) {
-      if (options == null) {
-        options = {};
-      }
-      options = parseOptions(options);
-      return scorer.prepQuery(query, options);
-    },
-    score: function(string, query, prepQuery, options) {
-      var allowErrors, isPath, optCharRegEx, pathSeparator, useExtensionBonus;
+    score: function(string, query, options) {
       if (options == null) {
         options = {};
       }
       if (!((string != null ? string.length : void 0) && (query != null ? query.length : void 0))) {
         return 0;
       }
-      options = parseOptions(options);
-      allowErrors = options.allowErrors, isPath = options.isPath, useExtensionBonus = options.useExtensionBonus, optCharRegEx = options.optCharRegEx, pathSeparator = options.pathSeparator;
-      if (prepQuery == null) {
-        prepQuery = prepQueryCache && prepQueryCache.query === query ? prepQueryCache : (prepQueryCache = scorer.prepQuery(query, options));
+      options = parseOptions(options, query);
+      if (options.usePathScoring) {
+        return pathScorer.score(string, query, options);
+      } else {
+        return scorer.score(string, query, options);
       }
-      return scorer.score(string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator);
     },
-    match: function(string, query, prepQuery, options) {
-      var allowErrors, baseMatches, isPath, matches, optCharRegEx, pathSeparator, string_lw, useExtensionBonus, _i, _ref, _results;
+    match: function(string, query, options) {
+      var _i, _ref, _results;
       if (options == null) {
         options = {};
       }
@@ -116,55 +114,136 @@
           return _results;
         }).apply(this);
       }
-      options = parseOptions(options);
-      allowErrors = options.allowErrors, isPath = options.isPath, useExtensionBonus = options.useExtensionBonus, optCharRegEx = options.optCharRegEx, pathSeparator = options.pathSeparator;
-      if (prepQuery == null) {
-        prepQuery = prepQueryCache && prepQueryCache.query === query ? prepQueryCache : (prepQueryCache = scorer.prepQuery(query, options));
+      options = parseOptions(options, query);
+      return matcher.match(string, query, options);
+    },
+    wrap: function(string, query, options) {
+      if (options == null) {
+        options = {};
       }
-      if (!(allowErrors || scorer.isMatch(string, prepQuery.core_lw, prepQuery.core_up))) {
+      if (!string) {
         return [];
       }
-      string_lw = string.toLowerCase();
-      matches = matcher.match(string, string_lw, prepQuery);
-      if (matches.length === 0) {
-        return matches;
+      if (!query) {
+        return [];
       }
-      if (string.indexOf(pathSeparator) > -1) {
-        baseMatches = matcher.basenameMatch(string, string_lw, prepQuery, pathSeparator);
-        matches = matcher.mergeMatches(matches, baseMatches);
+      options = parseOptions(options, query);
+      return matcher.wrap(string, query, options);
+    },
+    prepareQuery: function(query, options) {
+      if (options == null) {
+        options = {};
       }
-      return matches;
+      options = parseOptions(options, query);
+      return options.preparedQuery;
     }
   };
 
-  parseOptions = function(options) {
+  parseOptions = function(options, query) {
     if (options.allowErrors == null) {
       options.allowErrors = false;
     }
-    if (options.isPath == null) {
-      options.isPath = true;
+    if (options.usePathScoring == null) {
+      options.usePathScoring = true;
     }
     if (options.useExtensionBonus == null) {
-      options.useExtensionBonus = true;
+      options.useExtensionBonus = false;
     }
     if (options.pathSeparator == null) {
-      options.pathSeparator = scorer.pathSeparator;
+      options.pathSeparator = defaultPathSeparator;
     }
     if (options.optCharRegEx == null) {
       options.optCharRegEx = null;
+    }
+    if (options.wrap == null) {
+      options.wrap = null;
+    }
+    if (options.preparedQuery == null) {
+      options.preparedQuery = preparedQueryCache && preparedQueryCache.query === query ? preparedQueryCache : (preparedQueryCache = new Query(query, options));
     }
     return options;
   };
 
 }).call(this);
 
-},{"./filter":1,"./matcher":3,"./scorer":4}],3:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./filter":1,"./matcher":3,"./pathScorer":4,"./query":5,"./scorer":6,"_process":7}],3:[function(require,module,exports){
 (function() {
-  var scorer;
+  var basenameMatch, computeMatch, isMatch, isWordStart, match, mergeMatches, scoreAcronyms, scoreCharacter, scoreConsecutives, _ref;
 
-  scorer = require('./scorer');
+  _ref = require('./scorer'), isMatch = _ref.isMatch, isWordStart = _ref.isWordStart, scoreConsecutives = _ref.scoreConsecutives, scoreCharacter = _ref.scoreCharacter, scoreAcronyms = _ref.scoreAcronyms;
 
-  exports.basenameMatch = function(subject, subject_lw, prepQuery, pathSeparator) {
+  exports.match = match = function(string, query, options) {
+    var allowErrors, baseMatches, matches, pathSeparator, preparedQuery, string_lw;
+    allowErrors = options.allowErrors, preparedQuery = options.preparedQuery, pathSeparator = options.pathSeparator;
+    if (!(allowErrors || isMatch(string, preparedQuery.core_lw, preparedQuery.core_up))) {
+      return [];
+    }
+    string_lw = string.toLowerCase();
+    matches = computeMatch(string, string_lw, preparedQuery);
+    if (matches.length === 0) {
+      return matches;
+    }
+    if (string.indexOf(pathSeparator) > -1) {
+      baseMatches = basenameMatch(string, string_lw, preparedQuery, pathSeparator);
+      matches = mergeMatches(matches, baseMatches);
+    }
+    return matches;
+  };
+
+  exports.wrap = function(string, query, options) {
+    var matchIndex, matchPos, matchPositions, output, strPos, tagClass, tagClose, tagOpen, _ref1;
+    if ((options.wrap != null)) {
+      _ref1 = options.wrap, tagClass = _ref1.tagClass, tagOpen = _ref1.tagOpen, tagClose = _ref1.tagClose;
+    }
+    if (tagClass == null) {
+      tagClass = 'highlight';
+    }
+    if (tagOpen == null) {
+      tagOpen = '<strong class="' + tagClass + '">';
+    }
+    if (tagClose == null) {
+      tagClose = '</strong>';
+    }
+    if (string === query) {
+      return tagOpen + string + tagClose;
+    }
+    matchPositions = match(string, query, options);
+    if (matchPositions.length === 0) {
+      return string;
+    }
+    output = '';
+    matchIndex = -1;
+    strPos = 0;
+    while (++matchIndex < matchPositions.length) {
+      matchPos = matchPositions[matchIndex];
+      if (matchPos > strPos) {
+        output += string.substring(strPos, matchPos);
+        strPos = matchPos;
+      }
+      while (++matchIndex < matchPositions.length) {
+        if (matchPositions[matchIndex] === matchPos + 1) {
+          matchPos++;
+        } else {
+          matchIndex--;
+          break;
+        }
+      }
+      matchPos++;
+      if (matchPos > strPos) {
+        output += tagOpen;
+        output += string.substring(strPos, matchPos);
+        output += tagClose;
+        strPos = matchPos;
+      }
+    }
+    if (strPos < string.length - 1) {
+      output += string.substring(strPos);
+    }
+    return output;
+  };
+
+  basenameMatch = function(subject, subject_lw, preparedQuery, pathSeparator) {
     var basePos, depth, end;
     end = subject.length - 1;
     while (subject[end] === pathSeparator) {
@@ -174,7 +253,7 @@
     if (basePos === -1) {
       return [];
     }
-    depth = prepQuery.depth;
+    depth = preparedQuery.depth;
     while (depth-- > 0) {
       basePos = subject.lastIndexOf(pathSeparator, basePos - 1);
       if (basePos === -1) {
@@ -183,10 +262,10 @@
     }
     basePos++;
     end++;
-    return exports.match(subject.slice(basePos, end), subject_lw.slice(basePos, end), prepQuery, basePos);
+    return computeMatch(subject.slice(basePos, end), subject_lw.slice(basePos, end), preparedQuery, basePos);
   };
 
-  exports.mergeMatches = function(a, b) {
+  mergeMatches = function(a, b) {
     var ai, bj, i, j, m, n, out;
     m = a.length;
     n = b.length;
@@ -216,16 +295,16 @@
     return out;
   };
 
-  exports.match = function(subject, subject_lw, prepQuery, offset) {
+  computeMatch = function(subject, subject_lw, preparedQuery, offset) {
     var DIAGONAL, LEFT, STOP, UP, acro_score, align, backtrack, csc_diag, csc_row, csc_score, i, j, m, matches, move, n, pos, query, query_lw, score, score_diag, score_row, score_up, si_lw, start, trace;
     if (offset == null) {
       offset = 0;
     }
-    query = prepQuery.query;
-    query_lw = prepQuery.query_lw;
+    query = preparedQuery.query;
+    query_lw = preparedQuery.query_lw;
     m = subject.length;
     n = query.length;
-    acro_score = scorer.scoreAcronyms(subject, subject_lw, query, query_lw).score;
+    acro_score = scoreAcronyms(subject, subject_lw, query, query_lw).score;
     score_row = new Array(n);
     csc_row = new Array(n);
     STOP = 0;
@@ -251,9 +330,9 @@
         align = 0;
         score_diag = score_up;
         if (query_lw[j] === si_lw) {
-          start = scorer.isWordStart(i, subject, subject_lw);
-          csc_score = csc_diag > 0 ? csc_diag : scorer.scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
-          align = score_diag + scorer.scoreCharacter(i, j, start, acro_score, csc_score);
+          start = isWordStart(i, subject, subject_lw);
+          csc_score = csc_diag > 0 ? csc_diag : scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
+          align = score_diag + scoreCharacter(i, j, start, acro_score, csc_score);
         }
         score_up = score_row[j];
         csc_diag = csc_row[j];
@@ -305,51 +384,128 @@
 
 }).call(this);
 
-},{"./scorer":4}],4:[function(require,module,exports){
-(function (process){
+},{"./scorer":6}],4:[function(require,module,exports){
 (function() {
-  var AcronymResult, Query, coreChars, countDir, defaultPathSeparator, emptyAcronymResult, file_coeff, getCharCodes, getExtension, getExtensionScore, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, opt_char_re, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scoreMain, scorePath, scorePattern, scorePosition, scoreSize, tau_depth, tau_size, truncatedUpperCase, wm;
+  var computeScore, countDir, file_coeff, getExtension, getExtensionScore, isMatch, scorePath, scoreSize, tau_depth, _ref;
 
-  defaultPathSeparator = exports.pathSeparator = process && (process.platform === "win32") ? '\\' : '/';
-
-  wm = 150;
-
-  pos_bonus = 20;
+  _ref = require('./scorer'), isMatch = _ref.isMatch, computeScore = _ref.computeScore, scoreSize = _ref.scoreSize;
 
   tau_depth = 13;
 
-  tau_size = 85;
-
   file_coeff = 1.2;
 
-  miss_coeff = 0.75;
-
-  opt_char_re = /[ _\-:\/\\]/g;
-
-  exports.coreChars = coreChars = function(query, optCharRegEx) {
-    if (optCharRegEx == null) {
-      optCharRegEx = opt_char_re;
-    }
-    return query.replace(optCharRegEx, '');
-  };
-
-  exports.score = function(string, query, prepQuery, allowErrors, isPath, useExtensionBonus, pathSeparator) {
-    var score, string_lw;
-    if (!(allowErrors || isMatch(string, prepQuery.core_lw, prepQuery.core_up))) {
+  exports.score = function(string, query, options) {
+    var allowErrors, preparedQuery, score, string_lw;
+    preparedQuery = options.preparedQuery, allowErrors = options.allowErrors;
+    if (!(allowErrors || isMatch(string, preparedQuery.core_lw, preparedQuery.core_up))) {
       return 0;
     }
     string_lw = string.toLowerCase();
-    score = scoreMain(string, string_lw, prepQuery);
-    if (isPath) {
-      score = scorePath(string, string_lw, prepQuery, score, useExtensionBonus, pathSeparator);
-    }
+    score = computeScore(string, string_lw, preparedQuery);
+    score = scorePath(string, string_lw, score, options);
     return Math.ceil(score);
   };
 
-  Query = (function() {
+  scorePath = function(subject, subject_lw, fullPathScore, options) {
+    var alpha, basePathScore, basePos, depth, end, extAdjust, fileLength, pathSeparator, preparedQuery, useExtensionBonus;
+    if (fullPathScore === 0) {
+      return 0;
+    }
+    preparedQuery = options.preparedQuery, useExtensionBonus = options.useExtensionBonus, pathSeparator = options.pathSeparator;
+    end = subject.length - 1;
+    while (subject[end] === pathSeparator) {
+      end--;
+    }
+    basePos = subject.lastIndexOf(pathSeparator, end);
+    fileLength = end - basePos;
+    extAdjust = 1.0;
+    if (useExtensionBonus) {
+      extAdjust += getExtensionScore(subject_lw, preparedQuery.ext, basePos, end, 2);
+      fullPathScore *= extAdjust;
+    }
+    if (basePos === -1) {
+      return fullPathScore;
+    }
+    depth = preparedQuery.depth;
+    while (basePos > -1 && depth-- > 0) {
+      basePos = subject.lastIndexOf(pathSeparator, basePos - 1);
+    }
+    basePathScore = basePos === -1 ? fullPathScore : extAdjust * computeScore(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery);
+    alpha = 0.5 * tau_depth / (tau_depth + countDir(subject, end + 1, pathSeparator));
+    return alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * fileLength);
+  };
+
+  exports.countDir = countDir = function(path, end, pathSeparator) {
+    var count, i;
+    if (end < 1) {
+      return 0;
+    }
+    count = 0;
+    i = -1;
+    while (++i < end && path[i] === pathSeparator) {
+      continue;
+    }
+    while (++i < end) {
+      if (path[i] === pathSeparator) {
+        count++;
+        while (++i < end && path[i] === pathSeparator) {
+          continue;
+        }
+      }
+    }
+    return count;
+  };
+
+  exports.getExtension = getExtension = function(str) {
+    var pos;
+    pos = str.lastIndexOf(".");
+    if (pos < 0) {
+      return "";
+    } else {
+      return str.substr(pos + 1);
+    }
+  };
+
+  getExtensionScore = function(candidate, ext, startPos, endPos, maxDepth) {
+    var m, matched, n, pos;
+    if (!ext.length) {
+      return 0;
+    }
+    pos = candidate.lastIndexOf(".", endPos);
+    if (!(pos > startPos)) {
+      return 0;
+    }
+    n = ext.length;
+    m = endPos - pos;
+    if (m < n) {
+      n = m;
+      m = ext.length;
+    }
+    pos++;
+    matched = -1;
+    while (++matched < n) {
+      if (candidate[pos + matched] !== ext[matched]) {
+        break;
+      }
+    }
+    if (matched === 0 && maxDepth > 0) {
+      return 0.9 * getExtensionScore(candidate, ext, startPos, pos - 2, maxDepth - 1);
+    }
+    return matched / m;
+  };
+
+}).call(this);
+
+},{"./scorer":6}],5:[function(require,module,exports){
+(function() {
+  var Query, coreChars, countDir, getCharCodes, getExtension, opt_char_re, truncatedUpperCase, _ref;
+
+  _ref = require("./pathScorer"), countDir = _ref.countDir, getExtension = _ref.getExtension;
+
+  module.exports = Query = (function() {
     function Query(query, _arg) {
-      var optCharRegEx, pathSeparator, _ref;
-      _ref = _arg != null ? _arg : {}, optCharRegEx = _ref.optCharRegEx, pathSeparator = _ref.pathSeparator;
+      var optCharRegEx, pathSeparator, _ref1;
+      _ref1 = _arg != null ? _arg : {}, optCharRegEx = _ref1.optCharRegEx, pathSeparator = _ref1.pathSeparator;
       if (!(query && query.length)) {
         return null;
       }
@@ -367,8 +523,59 @@
 
   })();
 
-  exports.prepQuery = function(query, options) {
-    return new Query(query, options);
+  opt_char_re = /[ _\-:\/\\]/g;
+
+  coreChars = function(query, optCharRegEx) {
+    if (optCharRegEx == null) {
+      optCharRegEx = opt_char_re;
+    }
+    return query.replace(optCharRegEx, '');
+  };
+
+  truncatedUpperCase = function(str) {
+    var char, upper, _i, _len;
+    upper = "";
+    for (_i = 0, _len = str.length; _i < _len; _i++) {
+      char = str[_i];
+      upper += char.toUpperCase()[0];
+    }
+    return upper;
+  };
+
+  getCharCodes = function(str) {
+    var charCodes, i, len;
+    len = str.length;
+    i = -1;
+    charCodes = [];
+    while (++i < len) {
+      charCodes[str.charCodeAt(i)] = true;
+    }
+    return charCodes;
+  };
+
+}).call(this);
+
+},{"./pathScorer":4}],6:[function(require,module,exports){
+(function() {
+  var AcronymResult, computeScore, emptyAcronymResult, isAcronymFullWord, isMatch, isSeparator, isWordEnd, isWordStart, miss_coeff, pos_bonus, scoreAcronyms, scoreCharacter, scoreConsecutives, scoreExact, scoreExactMatch, scorePattern, scorePosition, scoreSize, tau_size, wm;
+
+  wm = 150;
+
+  pos_bonus = 20;
+
+  tau_size = 85;
+
+  miss_coeff = 0.75;
+
+  exports.score = function(string, query, options) {
+    var allowErrors, preparedQuery, score, string_lw;
+    preparedQuery = options.preparedQuery, allowErrors = options.allowErrors;
+    if (!(allowErrors || isMatch(string, preparedQuery.core_lw, preparedQuery.core_up))) {
+      return 0;
+    }
+    string_lw = string.toLowerCase();
+    score = computeScore(string, string_lw, preparedQuery);
+    return Math.ceil(score);
   };
 
   exports.isMatch = isMatch = function(subject, query_lw, query_up) {
@@ -396,10 +603,10 @@
     return true;
   };
 
-  scoreMain = function(subject, subject_lw, prepQuery) {
+  exports.computeScore = computeScore = function(subject, subject_lw, preparedQuery) {
     var acro, acro_score, align, csc_diag, csc_invalid, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
-    query = prepQuery.query;
-    query_lw = prepQuery.query_lw;
+    query = preparedQuery.query;
+    query_lw = preparedQuery.query_lw;
     m = subject.length;
     n = query.length;
     acro = scoreAcronyms(subject, subject_lw, query, query_lw);
@@ -432,7 +639,7 @@
     csc_invalid = true;
     while (++i < m) {
       si_lw = subject_lw[i];
-      if (prepQuery.charCodes[si_lw.charCodeAt(0)] == null) {
+      if (preparedQuery.charCodes[si_lw.charCodeAt(0)] == null) {
         if (csc_invalid !== true) {
           j = -1;
           while (++j < n) {
@@ -512,7 +719,7 @@
     }
   };
 
-  scoreSize = function(n, m) {
+  exports.scoreSize = scoreSize = function(n, m) {
     return tau_size / (tau_size + Math.abs(m - n));
   };
 
@@ -679,154 +886,18 @@
     return true;
   };
 
-  scorePath = function(subject, subject_lw, prepQuery, fullPathScore, useExtensionBonus, pathSeparator) {
-    var alpha, basePathScore, basePos, depth, end, extAdjust;
-    if (fullPathScore === 0) {
-      return 0;
-    }
-    end = subject.length - 1;
-    while (subject[end] === pathSeparator) {
-      end--;
-    }
-    basePos = subject.lastIndexOf(pathSeparator, end);
-    extAdjust = 1.0;
-    if (useExtensionBonus) {
-      extAdjust += getExtensionScore(subject_lw, prepQuery.ext, basePos, end, 2);
-      fullPathScore *= extAdjust;
-    }
-    if (basePos === -1) {
-      return fullPathScore;
-    }
-    depth = prepQuery.depth;
-    while (basePos > -1 && depth-- > 0) {
-      basePos = subject.lastIndexOf(pathSeparator, basePos - 1);
-    }
-    basePathScore = basePos === -1 ? fullPathScore : extAdjust * scoreMain(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), prepQuery);
-    alpha = 0.5 * tau_depth / (tau_depth + countDir(subject, end + 1, pathSeparator));
-    return alpha * basePathScore + (1 - alpha) * fullPathScore * scoreSize(0, file_coeff * (end - basePos));
-  };
-
-  exports.countDir = countDir = function(path, end, pathSeparator) {
-    var count, i;
-    if (end < 1) {
-      return 0;
-    }
-    count = 0;
-    i = -1;
-    while (++i < end && path[i] === pathSeparator) {
-      continue;
-    }
-    while (++i < end) {
-      if (path[i] === pathSeparator) {
-        count++;
-        while (++i < end && path[i] === pathSeparator) {
-          continue;
-        }
-      }
-    }
-    return count;
-  };
-
-  getExtension = function(str) {
-    var pos;
-    pos = str.lastIndexOf(".");
-    if (pos < 0) {
-      return "";
-    } else {
-      return str.substr(pos + 1);
-    }
-  };
-
-  getExtensionScore = function(candidate, ext, startPos, endPos, maxDepth) {
-    var m, matched, n, pos;
-    if (!ext.length) {
-      return 0;
-    }
-    pos = candidate.lastIndexOf(".", endPos);
-    if (!(pos > startPos)) {
-      return 0;
-    }
-    n = ext.length;
-    m = endPos - pos;
-    if (m < n) {
-      n = m;
-      m = ext.length;
-    }
-    pos++;
-    matched = -1;
-    while (++matched < n) {
-      if (candidate[pos + matched] !== ext[matched]) {
-        break;
-      }
-    }
-    if (matched === 0 && maxDepth > 0) {
-      return 0.9 * getExtensionScore(candidate, ext, startPos, pos - 2, maxDepth - 1);
-    }
-    return matched / m;
-  };
-
-  truncatedUpperCase = function(str) {
-    var char, upper, _i, _len;
-    upper = "";
-    for (_i = 0, _len = str.length; _i < _len; _i++) {
-      char = str[_i];
-      upper += char.toUpperCase()[0];
-    }
-    return upper;
-  };
-
-  getCharCodes = function(str) {
-    var charCodes, i, len;
-    len = str.length;
-    i = -1;
-    charCodes = [];
-    while (++i < len) {
-      charCodes[str.charCodeAt(i)] = true;
-    }
-    return charCodes;
-  };
-
 }).call(this);
 
-}).call(this,require('_process'))
-},{"_process":5}],5:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-(function () {
-  try {
-    cachedSetTimeout = setTimeout;
-  } catch (e) {
-    cachedSetTimeout = function () {
-      throw new Error('setTimeout is not defined');
-    }
-  }
-  try {
-    cachedClearTimeout = clearTimeout;
-  } catch (e) {
-    cachedClearTimeout = function () {
-      throw new Error('clearTimeout is not defined');
-    }
-  }
-} ())
 var queue = [];
 var draining = false;
 var currentQueue;
 var queueIndex = -1;
 
 function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
     draining = false;
     if (currentQueue.length) {
         queue = currentQueue.concat(queue);
@@ -842,7 +913,7 @@ function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = cachedSetTimeout(cleanUpNextTick);
+    var timeout = setTimeout(cleanUpNextTick);
     draining = true;
 
     var len = queue.length;
@@ -859,7 +930,7 @@ function drainQueue() {
     }
     currentQueue = null;
     draining = false;
-    cachedClearTimeout(timeout);
+    clearTimeout(timeout);
 }
 
 process.nextTick = function (fun) {
@@ -871,7 +942,7 @@ process.nextTick = function (fun) {
     }
     queue.push(new Item(fun, args));
     if (queue.length === 1 && !draining) {
-        cachedSetTimeout(drainQueue, 0);
+        setTimeout(drainQueue, 0);
     }
 };
 

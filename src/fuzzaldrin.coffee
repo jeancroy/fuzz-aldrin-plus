@@ -5,8 +5,7 @@ pathScorer = require './pathScorer'
 Query = require './query'
 
 preparedQueryCache = null
-defaultPathSeparator = if process and (process.platform is "win32") then '\\' else '/'
-
+defaultPathSeparator = if process?.platform is "win32" then '\\' else '/'
 
 module.exports =
 
