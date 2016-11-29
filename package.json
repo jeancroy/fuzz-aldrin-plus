@@ -9,11 +9,12 @@
       "url": "https://github.com/jeancroy/fuzzaldrin-plus/raw/master/LICENSE.md"
     }
   ],
-  "main": "./lib/fuzzaldrin.js",
+  "main": "./dist/node/fuzzaldrin.js",
   "scripts": {
-    "prepublish": "grunt prepublish",
-    "test": "grunt test",
-    "benchmark": "node_modules/.bin/coffee benchmark/benchmark.coffee"
+    "benchmark": "babel-node --presets es2015 benchmark/benchmark.js",
+    "test": "npm run lint && npm run mocha",
+    "mocha": "./node_modules/.bin/gulp test",
+    "lint": "./node_modules/.bin/gulp lint"
   },
   "repository": {
     "type": "git",
@@ -34,18 +35,31 @@
     "sublime"
   ],
   "devDependencies": {
-    "coffee-script": "~1.7",
-    "fuzzaldrin": "~2.1.0",
-    "grunt": "~0.4.1",
-    "grunt-bower-task": "^0.4.0",
-    "grunt-browserify": "^5.0.0",
-    "grunt-cli": "~0.1.8",
-    "grunt-coffeelint": "0.0.6",
-    "grunt-contrib-clean": "^1.0.0",
-    "grunt-contrib-coffee": "~0.9.0",
-    "grunt-contrib-uglify": "^1.0.1",
-    "grunt-nuget": "^0.1.6",
-    "grunt-shell": "~0.2.2",
-    "jasmine-focused": "1.x"
+    "babel-cli": "^6.18.0",
+    "babel-core": "^6.14.0",
+    "babel-loader": "^6.2.5",
+    "babel-plugin-transform-runtime": "^6.15.0",
+    "babel-preset-es2015": "^6.14.0",
+    "chai": "^3.5.0",
+    "del": "^2.2.2",
+    "eslint": "^3.5.0",
+    "eslint-config-idiomatic": "^2.1.0",
+    "eslint-loader": "^1.5.0",
+    "gulp": "^3.9.1",
+    "gulp-babel": "^6.1.2",
+    "gulp-eslint": "^3.0.1",
+    "gulp-if": "^2.0.2",
+    "gulp-mocha": "^3.0.1",
+    "gulp-nuget": "^1.0.3",
+    "gulp-uglify": "^2.0.0",
+    "mocha": "^3.1.2",
+    "request": "^2.79.0",
+    "run-sequence": "^1.2.2",
+    "vinyl-named": "^1.1.0",
+    "webpack": "^1.13.2",
+    "webpack-stream": "^3.2.0"
+  },
+  "optionalDependencies": {
+    "fuzzaldrin": "^2.1.0"
   }
 }

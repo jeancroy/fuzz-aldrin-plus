@@ -1,6 +1,5 @@
 node_modules/
-lib/
-dist/
 .idea/
 .DS_Store
 npm-debug.log
+*.exe

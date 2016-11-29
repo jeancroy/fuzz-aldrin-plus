@@ -12,6 +12,6 @@
     <tags>Fuzzy FuzzySearch Fuzzaldrin</tags>
   </metadata>
   <files>
-     <file src="dist-browser\$versiondir$\*.*" target="Content"/>
+     <file src="dist\browser\*.min.js" target="Content"/>
   </files>
 </package>
