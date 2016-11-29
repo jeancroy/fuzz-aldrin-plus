@@ -1,7 +1,7 @@
 {
   "name": "fuzzaldrin-plus",
   "description": "Fuzzy filtering and string similarity scoring - compatible with fuzzaldrin",
-  "main": "./dist-browser/fuzzaldrin-plus.js",
+  "main": "./dist/browser/fuzzaldrin-plus.js",
   "authors": [
     "Jean Christophe Roy <jcking@gmail.com>"
   ],
