@@ -14,7 +14,7 @@
 const wm = 150;
 
 //Fading function
-const pos_bonus = 20; // The character from 0..pos_bonus receive a greater bonus for being at the start of string.
+const pos_bonus = 20; // The character from 0..pos_bonus receive a greater bonus for being at the init of string.
 const tau_size = 85; // Full path length at which the whole match score is halved.
 
 // Miss count
@@ -51,7 +51,7 @@ export function score(string, query, options) {
         return 0;
     }
     let string_lw = string.toLowerCase();
-    let score = computeScore(string, string_lw, preparedQuery);
+    let score = computeScore(string, string_lw, options);
     return Math.ceil(score);
 }
 
@@ -103,14 +103,15 @@ export function isMatch(subject, query_lw, query_up) {
 // Main scoring algorithm
 //
 
-export function computeScore(subject, subject_lw, preparedQuery) {
-    let {query} = preparedQuery;
-    let {query_lw} = preparedQuery;
+export function computeScore(subject, subject_lw, options) {
+    let {preparedQuery} = options;
+    let {query, query_lw} = preparedQuery;
+    let flexUppercase = true;
+
 
     let m = subject.length;
     let n = query.length;
-
-    let score = 0;
+    let current_score = 0;
 
     //----------------------------
     // Abbreviations sequence
@@ -154,7 +155,7 @@ export function computeScore(subject, subject_lw, preparedQuery) {
         csc_row[j] = 0;
     }
 
-    // Limit the search to the active region
+    // Limit the search to the isActive region
     // for example with query `abc`, subject `____a_bc_ac_c____`
     // there's a region before first `a` and after last `c`
     // that can be simplified out of the matching process
@@ -174,6 +175,7 @@ export function computeScore(subject, subject_lw, preparedQuery) {
     let csc_invalid = true;
 
     while (++i < m) {     //foreach char si of subject
+
         let si_lw = subject_lw[i];
 
         // if si_lw is not in query
@@ -189,7 +191,9 @@ export function computeScore(subject, subject_lw, preparedQuery) {
             continue;
         }
 
-        score = 0;
+        let si = subject_lw[i];
+
+        current_score = 0;
         let score_diag = 0;
         let csc_diag = 0;
         let record_miss = true;
@@ -202,37 +206,51 @@ export function computeScore(subject, subject_lw, preparedQuery) {
             // score_up contain the score of a gap in subject.
             // score_left = last iteration of score, -> gap in query.
             let score_up = score_row[j];
-            if (score_up > score) {
-                score = score_up;
+            if (score_up > current_score) {
+                current_score = score_up;
             }
 
             //Reset consecutive
             let csc_score = 0;
+            let qj_lw = query_lw[j];
 
-            //Compute a tentative match
-            if (query_lw[j] === si_lw) {
 
-                let start = isWordStart(i, subject, subject_lw);
+            // Compute a tentative match
+            // First check case-insesitive match
+            if (qj_lw === si_lw ) {
 
-                // Forward search for a sequence of consecutive char
-                csc_score = csc_diag > 0 ? csc_diag :
-                    scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
+                // Refine for strict Uppercase
+                //
+                // When do we have a match ?
+                // A) Case Insensitive Match && Not strict Uppercase
+                // B) Case Insensitive Match && Query is lowercase
+                // C) Case Sensitive Match. (Imply Case Insensitive)
 
-                // Determine bonus for matching A[i] with B[j]
-                let align = score_diag + scoreCharacter(i, j, start, acro_score, csc_score);
+                let qj = query[j];
+                if(flexUppercase || qj_lw === qj || si === qj){
 
-                //Are we better using this match or taking the best gap (currently stored in score)?
-                if (align > score) {
-                    score = align;
-                    // reset consecutive missed hit count
-                    miss_left = miss_budget;
-                } else {
-                    // We rejected this match and record a miss.
-                    // If budget is exhausted exit
-                    if (record_miss && --miss_left <= 0) {
-                        return score_row[n - 1] * sz;
+                    let start = isWordStart(i, subject, subject_lw);
+
+                    // Forward search for a sequence of consecutive char
+                    csc_score = csc_diag > 0 ? csc_diag :
+                        scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
+
+                    // Determine bonus for matching A[i] with B[j]
+                    let align_score = score_diag + scoreCharacter(i, j, start, acro_score, csc_score);
+
+                    //Are we better using this match or taking the best gap (currently stored in score)?
+                    if (align_score > current_score) {
+                        current_score = align_score;
+                        // reset consecutive missed hit count
+                        miss_left = miss_budget;
+                    } else {
+                        // We rejected this match and record a miss.
+                        // If budget is exhausted exit
+                        if (record_miss && --miss_left <= 0) {
+                            return score_row[n - 1] * sz;
+                        }
+                        record_miss = false;
                     }
-                    record_miss = false;
                 }
             }
 
@@ -241,20 +259,20 @@ export function computeScore(subject, subject_lw, preparedQuery) {
             score_diag = score_up;
             csc_diag = csc_row[j];
             csc_row[j] = csc_score;
-            score_row[j] = score;
+            score_row[j] = current_score;
         }
     }
 
     // get highest score so far
-    score = score_row[n - 1];
-    return score * sz;
+    current_score = score_row[n - 1];
+    return current_score * sz;
 
 }
 
 //
 // Boundaries
 //
-// Is the character at the start of a word, end of the word, or a separator ?
+// Is the character at the init of a word, end of the word, or a separator ?
 // Fortunately those small function inline well.
 //
 
@@ -350,7 +368,7 @@ export function scorePattern(count, len, sameCase, start, end) {
 
 export function scoreCharacter(i, j, start, acro_score, csc_score) {
 
-    // start of string / position of match bonus
+    // init of string / position of match bonus
     let posBonus = scorePosition(i);
 
     // match IS a word boundary
@@ -377,12 +395,15 @@ export function scoreConsecutives(subject, subject_lw, query, query_lw, i, j, st
     let k = mi < nj ? mi : nj;
 
     let sameCase = 0;
-    let sz = 0; //sz will be one more than the last qi is sj
 
     // query_lw[i] is subject_lw[j] has been checked before entering now do case sensitive check.
     if (query[j] === subject[i]) {
         sameCase++;
     }
+
+    // size of consecutive
+    // sz will be one more than the last index where query[j] == subject[i] (lowercase)
+    let sz = 0;
 
     //Continue while lowercase char are the same, record when they are case-sensitive match.
     while (++sz < k && query_lw[++j] === subject_lw[++i]) {
@@ -409,13 +430,13 @@ export function scoreConsecutives(subject, subject_lw, query, query_lw, i, j, st
 
 export function scoreExactMatch(subject, subject_lw, query, query_lw, pos, n, m) {
 
-    // Test for word start
+    // Test for word init
     let start = isWordStart(pos, subject, subject_lw);
 
     // Heuristic
-    // If not a word start, test next occurrence
+    // If not a word init, test next occurrence
     // - We want exact match to be fast
-    // - For exact match, word start has the biggest impact on score.
+    // - For exact match, word init has the biggest impact on score.
     // - Testing 2 instances is somewhere between testing only one and testing every instances.
 
     if (!start) {
@@ -495,7 +516,7 @@ export function scoreAcronyms(subject, subject_lw, query, query_lw) {
         }
 
         // For other characters we search for the first match where subject[i] = query[j]
-        // that also happens to be a start-of-word
+        // that also happens to be a init-of-word
 
         while (++i < m) {
             if (qj_lw === subject_lw[i] && isWordStart(i, subject, subject_lw)) {
@@ -521,7 +542,7 @@ export function scoreAcronyms(subject, subject_lw, query, query_lw) {
         return emptyAcronymResult;
     }
 
-    // Acronym are scored as start-of-word
+    // Acronym are scored as init-of-word
     // Unless the acronym is a 1:1 match with candidate then it is upgraded to full-word.
     let fullWord = count === n ? isAcronymFullWord(subject, subject_lw, query, count) : false;
     let score = scorePattern(count, n, sameCase, true, fullWord);

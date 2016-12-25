@@ -1,6 +1,6 @@
-import {filter as processFilter} from "./lib/filter";
+import {filterSync as processFilterSync, filterAsync as processFilterAsync} from "./lib/filter";
 import {score as processScore} from "./lib/scorer";
-import  {score as processPathScore} from "./lib/pathScorer";
+import {score as processPathScore} from "./lib/pathScorer";
 import {match as processMatch, wrap as processWrap} from "./lib/matcher";
 import {Query} from "./lib/query";
 
@@ -26,7 +26,7 @@ let preparedQueryCache = null;
  *
  *  Output is sorted by match score.
  *
- * @param {Array.<(string|object)>} candidates - array of string or objects
+ * @param {Array.<(string|object)>|Iterable} candidates - array of string or objects
  * @param {string} query - string to search for in each candidate
  * @param {FilterOptions=} options - (optional) see option hash doc
  * @returns {Array.<(string|object)>} - filtered & sorted subset of input candidates
@@ -34,10 +34,30 @@ let preparedQueryCache = null;
 
 export function filter(candidates, query, options) {
 
-    if (query == null || !query.length) return [];
-    if (candidates == null || !candidates.length) return [];
+    if (!checkString(query)) return [];
+    if (!checkCollection(candidates)) return [];
+
     options = parseOptions(options, query);
-    return processFilter(candidates, query, options);
+    return processFilterSync(candidates, query, options);
+
+}
+
+/**
+ *
+ * @param candidates
+ * @param query
+ * @param options
+ * @param {filterCallback} callback
+ * @returns {FilterState}
+ */
+
+export function filterAsync(candidates, query, callback, options) {
+
+    if (!checkString(query)) return [];
+    if (!checkCollection(candidates)) return [];
+
+    options = parseOptions(options, query);
+    return processFilterAsync(candidates, query, callback, options);
 
 }
 
@@ -58,8 +78,8 @@ export function filter(candidates, query, options) {
 
 export function score(string, query, options) {
 
-    if (string == null || !string.length) return 0;
-    if (query == null || !query.length) return 0;
+    if (!checkString(string)) return 0;
+    if (!checkString(query)) return 0;
 
     options = parseOptions(options, query);
 
@@ -85,8 +105,8 @@ export function score(string, query, options) {
 
 export function match(string, query, options) {
 
-    if (string == null || !string.length) return [];
-    if (query == null || !query.length) return [];
+    if (!checkString(string)) return [];
+    if (!checkString(query)) return [];
 
     //If both are the same, return an array of consecutive numbers
     if (string === query) {
@@ -127,8 +147,8 @@ export function match(string, query, options) {
 
 export function wrap(string, query, options) {
 
-    if (string == null || !string.length) return "";
-    if (query == null || !query.length) return "";
+    if (!checkString(string)) return "";
+    if (!checkString(query)) return string;
 
     options = parseOptions(options, query);
     return processWrap(string, query, options);
@@ -155,6 +175,18 @@ export function wrap(string, query, options) {
 export function prepareQuery(query, options) {
     options = parseOptions(options, query);
     return options.preparedQuery;
+}
+
+
+function checkString(str){
+    //Not null, must have length property > 0
+    return str != null && str.length != null && str.length > 0;
+}
+
+function checkCollection(obj){
+    // Not null
+    // If object has length or size property, must be != 0
+    return obj != null && obj.length !== 0 && obj.size !== 0
 }
 
 
@@ -199,12 +231,14 @@ let defaultOptions = {
     preparedQuery: null,
 };
 
+
 /**
  *
  * @param {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options
  * @param {string} query
  * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
  */
+
 function parseOptions(options, query) {
 
     // If no options given, copy default
@@ -239,8 +273,8 @@ function parseOptions(options, query) {
 
 /**
  * @typedef {Object} QueryOptions
- * @property {string} pathSeparator - If candidate are path, indicate path seperator used.
- * @property {RegExp} optCharRegEx - Some characters do not have to match exactly, example `space`.
+ * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
+ * @property {RegExp} optCharRegEx - Regex that identify character that does not have to match exactly, for example <whitespace>.
  *
  */
 
@@ -260,9 +294,12 @@ function parseOptions(options, query) {
  * @typedef {Object} FilterOptions
  * @extends ScoringOptions
  *
- * @property {string} key - Object are given, this is the key of object that contain the string to be scored.
+ * @property {string|function} key - Name of the property that contain string ot be scored
+ *                                   or function that input candidate and output string to be scored.
+ *
  * @property {number} maxResults - Output the top `maxResults` best results at most.
- * @property {number} maxInners - Speed vs correctness optimisation: stop filtering after that many positive results
+ * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
+ *
  */
 
 /**
@@ -279,5 +316,26 @@ function parseOptions(options, query) {
  * @property {string} tagOpen - string to place before a match default to `<strong class="highlight">`
  * @property {string} tagClose - string to place after a match default to `</strong>`
  * @property {string} tagClass - change the class of the default open tag (tagOpen must be unset)
+ *
+ */
+
+
+//
+// Async
+//
+
+/**
+ * @callback filterCallback
+ * @param {Array} results
+ * @param {FilterState} state
+ */
+
+/**
+ * @typedef {Object} FilterState
+ *
+ * @method  abort - stop scoring and return no results.
+ * @method  isActive - is the filter running.
+ * @method  isCanceled - has the filter been canceled.
+ * @method  getProgressCount - get the count of processed elements.
  *
  */

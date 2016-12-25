@@ -58,6 +58,7 @@
 	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
 	exports.filter = filter;
+	exports.filterAsync = filterAsync;
 	exports.score = score;
 	exports.match = match;
 	exports.wrap = wrap;
@@ -69,9 +70,9 @@
 
 	var _pathScorer = __webpack_require__(4);
 
-	var _matcher = __webpack_require__(5);
+	var _matcher = __webpack_require__(6);
 
-	var _query = __webpack_require__(6);
+	var _query = __webpack_require__(7);
 
 	var fuzzaldrin = {
 	    filter: filter,
@@ -96,7 +97,7 @@
 	 *
 	 *  Output is sorted by match score.
 	 *
-	 * @param {Array.<(string|object)>} candidates - array of string or objects
+	 * @param {Array.<(string|object)>|Iterable} candidates - array of string or objects
 	 * @param {string} query - string to search for in each candidate
 	 * @param {FilterOptions=} options - (optional) see option hash doc
 	 * @returns {Array.<(string|object)>} - filtered & sorted subset of input candidates
@@ -104,10 +105,29 @@
 
 	function filter(candidates, query, options) {
 
-	    if (query == null || !query.length) return [];
-	    if (candidates == null || !candidates.length) return [];
+	    if (!checkString(query)) return [];
+	    if (!checkCollection(candidates)) return [];
+
 	    options = parseOptions(options, query);
-	    return (0, _filter.filter)(candidates, query, options);
+	    return (0, _filter.filterSync)(candidates, query, options);
+	}
+
+	/**
+	 *
+	 * @param candidates
+	 * @param query
+	 * @param options
+	 * @param {filterCallback} callback
+	 * @returns {FilterState}
+	 */
+
+	function filterAsync(candidates, query, callback, options) {
+
+	    if (!checkString(query)) return [];
+	    if (!checkCollection(candidates)) return [];
+
+	    options = parseOptions(options, query);
+	    return (0, _filter.filterAsync)(candidates, query, callback, options);
 	}
 
 	/**
@@ -127,8 +147,8 @@
 
 	function score(string, query, options) {
 
-	    if (string == null || !string.length) return 0;
-	    if (query == null || !query.length) return 0;
+	    if (!checkString(string)) return 0;
+	    if (!checkString(query)) return 0;
 
 	    options = parseOptions(options, query);
 
@@ -153,8 +173,8 @@
 
 	function match(string, query, options) {
 
-	    if (string == null || !string.length) return [];
-	    if (query == null || !query.length) return [];
+	    if (!checkString(string)) return [];
+	    if (!checkString(query)) return [];
 
 	    //If both are the same, return an array of consecutive numbers
 	    if (string === query) {
@@ -194,8 +214,8 @@
 
 	function wrap(string, query, options) {
 
-	    if (string == null || !string.length) return "";
-	    if (query == null || !query.length) return "";
+	    if (!checkString(string)) return "";
+	    if (!checkString(query)) return string;
 
 	    options = parseOptions(options, query);
 	    return (0, _matcher.wrap)(string, query, options);
@@ -221,6 +241,17 @@
 	function prepareQuery(query, options) {
 	    options = parseOptions(options, query);
 	    return options.preparedQuery;
+	}
+
+	function checkString(str) {
+	    //Not null, must have length property > 0
+	    return str != null && str.length != null && str.length > 0;
+	}
+
+	function checkCollection(obj) {
+	    // Not null
+	    // If object has length or size property, must be != 0
+	    return obj != null && obj.length !== 0 && obj.size !== 0;
 	}
 
 	//
@@ -268,6 +299,7 @@
 	 * @param {string} query
 	 * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
 	 */
+
 	function parseOptions(options, query) {
 
 	    // If no options given, copy default
@@ -301,8 +333,8 @@
 
 	/**
 	 * @typedef {Object} QueryOptions
-	 * @property {string} pathSeparator - If candidate are path, indicate path seperator used.
-	 * @property {RegExp} optCharRegEx - Some characters do not have to match exactly, example `space`.
+	 * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
+	 * @property {RegExp} optCharRegEx - Regex that identify character that does not have to match exactly, for example <whitespace>.
 	 *
 	 */
 
@@ -321,9 +353,12 @@
 	 * @typedef {Object} FilterOptions
 	 * @extends ScoringOptions
 	 *
-	 * @property {string} key - Object are given, this is the key of object that contain the string to be scored.
+	 * @property {string|function} key - Name of the property that contain string ot be scored
+	 *                                   or function that input candidate and output string to be scored.
+	 *
 	 * @property {number} maxResults - Output the top `maxResults` best results at most.
-	 * @property {number} maxInners - Speed vs correctness optimisation: stop filtering after that many positive results
+	 * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
+	 *
 	 */
 
 	/**
@@ -343,6 +378,26 @@
 	 *
 	 */
 
+	//
+	// Async
+	//
+
+	/**
+	 * @callback filterCallback
+	 * @param {Array} results
+	 * @param {FilterState} state
+	 */
+
+	/**
+	 * @typedef {Object} FilterState
+	 *
+	 * @method  abort - stop scoring and return no results.
+	 * @method  isActive - is the filter running.
+	 * @method  isCanceled - has the filter been canceled.
+	 * @method  getProgressCount - get the count of processed elements.
+	 *
+	 */
+
 /***/ },
 /* 2 */
 /***/ function(module, exports, __webpack_require__) {
@@ -350,7 +405,9 @@
 	"use strict";
 
 	exports.__esModule = true;
-	exports.filter = filter;
+	exports.FilterState = undefined;
+	exports.filterSync = filterSync;
+	exports.filterAsync = filterAsync;
 
 	var _scorer = __webpack_require__(3);
 
@@ -360,77 +417,253 @@
 
 	var _pathScorer2 = _interopRequireDefault(_pathScorer);
 
+	var _utils = __webpack_require__(5);
+
+	var _utils2 = _interopRequireDefault(_utils);
+
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
 	exports.default = {
-	    filter: filter
+	    filterSync: filterSync,
+	    filterAsync: filterAsync
 	};
-	function filter(candidates, query, options) {
-	    var scoredCandidates = [];
 
-	    // See also option parsing on main module for default
-	    var key = options.key,
-	        maxResults = options.maxResults,
-	        maxInners = options.maxInners,
-	        usePathScoring = options.usePathScoring;
+	/**
+	 *
+	 * @param {Array|Iterable} candidates
+	 * @param {string} query
+	 * @param {FilterOptions} options
+	 * @returns {Array}
+	 */
 
-	    var spotLeft = maxInners != null && maxInners > 0 ? maxInners : candidates.length + 1;
-	    var bKey = key != null;
-	    var scoreProvider = usePathScoring ? _pathScorer2.default : _scorer2.default;
+	function filterSync(candidates, query, options) {
+	    var state = new FilterStateInternal();
+	    return executeFilter(candidates, query, state, options);
+	}
 
-	    for (var _iterator = candidates, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[Symbol.iterator]();;) {
-	        var _ref;
+	/**
+	 *
+	 * @param {Array|Iterable} candidates
+	 * @param {string} query
+	 * @param {FilterOptions} options
+	 * @param {filterCallback} callback
+	 * @returns {FilterState}
+	 */
 
-	        if (_isArray) {
-	            if (_i >= _iterator.length) break;
-	            _ref = _iterator[_i++];
-	        } else {
-	            _i = _iterator.next();
-	            if (_i.done) break;
-	            _ref = _i.value;
-	        }
+	function filterAsync(candidates, query, callback, options) {
 
-	        var candidate = _ref;
+	    var internalState = new FilterStateInternal();
+	    var publicState = new FilterState(internalState);
 
+	    var scheduled = function scheduled() {
+	        callback(executeFilter(candidates, query, internalState, options), publicState);
+	    };
 
-	        // Get the candidate value
-	        var string = bKey ? candidate[key] : candidate;
-	        if (string == null || !string.length) {
-	            continue;
-	        }
-
-	        // Get score, If score greater than 0 add to valid results
-	        var score = scoreProvider.score(string, query, options);
-	        if (score > 0) {
-	            scoredCandidates.push({ candidate: candidate, score: score });
-	            spotLeft -= 1;
-	            if (spotLeft <= 0) {
-	                break;
-	            }
-	        }
+	    if (typeof setImmediate === "function") {
+	        setImmediate(scheduled);
+	    } else {
+	        setTimeout(scheduled, 0);
 	    }
 
-	    //  Sort scores in descending order
-	    scoredCandidates.sort(sortCandidates);
+	    return publicState;
+	}
 
-	    // Extract original candidate
-	    var validCandidates = scoredCandidates.map(pluckCandidates);
+	/**
+	 *
+	 * @param {Array|Iterable} candidates
+	 * @param {string} query
+	 * @param {FilterStateInternal} state
+	 * @param {FilterOptions} options
+	 * @returns {Array}
+	 */
+
+	function executeFilter(candidates, query, state, options) {
+
+	    if (state.shouldAbort) return [];
+
+	    // See option parsing on main module for default
+	    var key = options.key,
+	        maxResults = options.maxResults,
+	        outputScore = options.outputScore,
+	        usePathScoring = options.usePathScoring;
+
+	    var scoreProvider = usePathScoring ? _pathScorer2.default : _scorer2.default;
+
+	    // If list of object, we need to get the string to be scored, as defined by options.key
+	    // If the key is a method, that method should take an object and return the string.
+	    // Else we assume it is the name of a property on candidate object.
+	    var accessor = null;
+	    if (key != null) {
+	        accessor = _utils2.default.isFunction(options.key) ? options.key : function (x) {
+	            return x[key];
+	        };
+	    }
+
+	    // Init state
+	    state.isActive = true;
+	    state.accessor = accessor;
+	    state.scoreProvider = scoreProvider;
+	    state.scoredCandidates = [];
+
+	    // Iterate candidate list and collect scored positive matches.
+	    processCollection(candidates, query, state, options);
+
+	    // Collect positives matches
+	    var scoredCandidates = state.scoredCandidates;
+
+	    // Cleanup
+	    state.scoredCandidates = null;
+	    state.isActive = false;
+
+	    // Quick exit
+	    if (state.shouldAbort || scoredCandidates == null || !scoredCandidates.length) return [];
+
+	    // Sort scores in descending order
+	    scoredCandidates.sort(sortCandidates);
 
 	    // Trim to maxResults if specified
 	    if (maxResults != null) {
-	        validCandidates = candidates.slice(0, maxResults);
+	        scoredCandidates = scoredCandidates.slice(0, maxResults);
 	    }
 
-	    // And return
-	    return validCandidates;
+	    if (outputScore === true) {
+	        return scoredCandidates;
+	    } else {
+	        // Extract original candidate and return
+	        return scoredCandidates.map(pluckCandidates);
+	    }
+	}
+
+	function processCollection(collection, query, state, options) {
+
+	    //
+	    // Collection is an array
+	    //
+
+	    if (_utils2.default.isArray(collection)) {
+	        for (var i = 0; i <= collection.length; i++) {
+	            if (!processItem(collection[i], query, state, options)) break;
+	        }
+
+	        return;
+	    }
+
+	    //
+	    // Collection implements es6 iterator protocol
+	    //
+
+	    var iterator = _utils2.default.getIterator(collection);
+	    if (iterator != null) {
+	        var item = void 0;
+	        while (item = iterator.next()) {
+	            if (item.done) break;
+	            if (!processItem(item.value, query, state, options)) break;
+	        }
+
+	        return;
+	    }
+
+	    //
+	    // Collection implements 'forEach'
+	    //
+
+	    // Some implementations  of foreach allow to exit using return false. (Eg Immutablejs)
+	    //      processItem follow that convention .
+	    //
+	    // Others cannot be interrupted ( Eg default Array.forEach )
+	    //      so we continue iteration but short circuit most of the work.
+
+	    var cont = true;
+	    if (_utils2.default.isFunction(collection.forEach)) {
+	        collection.forEach(function (item) {
+	            return cont = cont && processItem(item, query, state, options);
+	        });
+	    }
+	}
+
+	/**
+	 *
+	 * @param {string|object} candidate
+	 * @param {string} query
+	 * @param {FilterStateInternal} context
+	 * @param {FilterOptions} options
+	 * @returns {boolean}
+	 */
+
+	function processItem(candidate, query, context, options) {
+
+	    if (context.shouldAbort) return false;
+	    context.count++;
+
+	    var accessor = context.accessor,
+	        scoredCandidates = context.scoredCandidates,
+	        scoreProvider = context.scoreProvider;
+
+	    // Get the string representation of candidate
+
+	    var string = accessor != null ? accessor(candidate) : candidate;
+	    if (string == null || !string.length) {
+	        return true;
+	    }
+
+	    // Get score, If score greater than 0 add to valid results
+	    var score = scoreProvider.score(string, query, options);
+	    if (score > 0) {
+	        scoredCandidates.push({ candidate: candidate, score: score });
+	    }
+
+	    return true;
 	}
 
 	function pluckCandidates(a) {
 	    return a.candidate;
 	}
+
 	function sortCandidates(a, b) {
 	    return b.score - a.score;
 	}
+
+	var FilterStateInternal = function FilterStateInternal() {
+	    _classCallCheck(this, FilterStateInternal);
+
+	    this.isActive = false;
+	    this.shouldAbort = false;
+	    this.count = 0;
+	    this.scoredCandidates = null;
+	    this.accessor = null;
+	    this.scoreProvider = null;
+	};
+
+	var FilterState =
+
+	/**
+	 * @param {FilterStateInternal} internalState
+	 */
+
+	exports.FilterState = function FilterState(internalState) {
+	    _classCallCheck(this, FilterState);
+
+	    // Closure over the internal state to make it read-only.
+
+	    this.abort = function () {
+	        internalState.isActive = false;
+	        internalState.shouldAbort = true;
+	    };
+
+	    this.isActive = function () {
+	        return internalState.isActive;
+	    };
+
+	    this.isCanceled = function () {
+	        return internalState.shouldAbort;
+	    };
+
+	    this.getProgressCount = function () {
+	        return internalState.count;
+	    };
+	};
 
 /***/ },
 /* 3 */
@@ -472,7 +705,7 @@
 	var wm = 150;
 
 	//Fading function
-	var pos_bonus = 20; // The character from 0..pos_bonus receive a greater bonus for being at the start of string.
+	var pos_bonus = 20; // The character from 0..pos_bonus receive a greater bonus for being at the init of string.
 	var tau_size = 85; // Full path length at which the whole match score is halved.
 
 	// Miss count
@@ -508,7 +741,7 @@
 	        return 0;
 	    }
 	    var string_lw = string.toLowerCase();
-	    var score = computeScore(string, string_lw, preparedQuery);
+	    var score = computeScore(string, string_lw, options);
 	    return Math.ceil(score);
 	}
 
@@ -558,15 +791,16 @@
 	// Main scoring algorithm
 	//
 
-	function computeScore(subject, subject_lw, preparedQuery) {
-	    var query = preparedQuery.query;
-	    var query_lw = preparedQuery.query_lw;
+	function computeScore(subject, subject_lw, options) {
+	    var preparedQuery = options.preparedQuery;
+	    var query = preparedQuery.query,
+	        query_lw = preparedQuery.query_lw;
 
+	    var flexUppercase = true;
 
 	    var m = subject.length;
 	    var n = query.length;
-
-	    var score = 0;
+	    var current_score = 0;
 
 	    //----------------------------
 	    // Abbreviations sequence
@@ -609,7 +843,7 @@
 	        csc_row[j] = 0;
 	    }
 
-	    // Limit the search to the active region
+	    // Limit the search to the isActive region
 	    // for example with query `abc`, subject `____a_bc_ac_c____`
 	    // there's a region before first `a` and after last `c`
 	    // that can be simplified out of the matching process
@@ -630,6 +864,7 @@
 
 	    while (++i < m) {
 	        //foreach char si of subject
+
 	        var si_lw = subject_lw[i];
 
 	        // if si_lw is not in query
@@ -645,7 +880,9 @@
 	            continue;
 	        }
 
-	        score = 0;
+	        var si = subject_lw[i];
+
+	        current_score = 0;
 	        var score_diag = 0;
 	        var csc_diag = 0;
 	        var record_miss = true;
@@ -659,36 +896,49 @@
 	            // score_up contain the score of a gap in subject.
 	            // score_left = last iteration of score, -> gap in query.
 	            var score_up = score_row[j];
-	            if (score_up > score) {
-	                score = score_up;
+	            if (score_up > current_score) {
+	                current_score = score_up;
 	            }
 
 	            //Reset consecutive
 	            var csc_score = 0;
+	            var qj_lw = query_lw[j];
 
-	            //Compute a tentative match
-	            if (query_lw[j] === si_lw) {
+	            // Compute a tentative match
+	            // First check case-insesitive match
+	            if (qj_lw === si_lw) {
 
-	                var start = isWordStart(i, subject, subject_lw);
+	                // Refine for strict Uppercase
+	                //
+	                // When do we have a match ?
+	                // A) Case Insensitive Match && Not strict Uppercase
+	                // B) Case Insensitive Match && Query is lowercase
+	                // C) Case Sensitive Match. (Imply Case Insensitive)
 
-	                // Forward search for a sequence of consecutive char
-	                csc_score = csc_diag > 0 ? csc_diag : scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
+	                var qj = query[j];
+	                if (flexUppercase || qj_lw === qj || si === qj) {
 
-	                // Determine bonus for matching A[i] with B[j]
-	                var align = score_diag + scoreCharacter(i, j, start, acro_score, csc_score);
+	                    var start = isWordStart(i, subject, subject_lw);
 
-	                //Are we better using this match or taking the best gap (currently stored in score)?
-	                if (align > score) {
-	                    score = align;
-	                    // reset consecutive missed hit count
-	                    miss_left = miss_budget;
-	                } else {
-	                    // We rejected this match and record a miss.
-	                    // If budget is exhausted exit
-	                    if (record_miss && --miss_left <= 0) {
-	                        return score_row[n - 1] * sz;
+	                    // Forward search for a sequence of consecutive char
+	                    csc_score = csc_diag > 0 ? csc_diag : scoreConsecutives(subject, subject_lw, query, query_lw, i, j, start);
+
+	                    // Determine bonus for matching A[i] with B[j]
+	                    var align_score = score_diag + scoreCharacter(i, j, start, acro_score, csc_score);
+
+	                    //Are we better using this match or taking the best gap (currently stored in score)?
+	                    if (align_score > current_score) {
+	                        current_score = align_score;
+	                        // reset consecutive missed hit count
+	                        miss_left = miss_budget;
+	                    } else {
+	                        // We rejected this match and record a miss.
+	                        // If budget is exhausted exit
+	                        if (record_miss && --miss_left <= 0) {
+	                            return score_row[n - 1] * sz;
+	                        }
+	                        record_miss = false;
 	                    }
-	                    record_miss = false;
 	                }
 	            }
 
@@ -696,19 +946,19 @@
 	            score_diag = score_up;
 	            csc_diag = csc_row[j];
 	            csc_row[j] = csc_score;
-	            score_row[j] = score;
+	            score_row[j] = current_score;
 	        }
 	    }
 
 	    // get highest score so far
-	    score = score_row[n - 1];
-	    return score * sz;
+	    current_score = score_row[n - 1];
+	    return current_score * sz;
 	}
 
 	//
 	// Boundaries
 	//
-	// Is the character at the start of a word, end of the word, or a separator ?
+	// Is the character at the init of a word, end of the word, or a separator ?
 	// Fortunately those small function inline well.
 	//
 
@@ -801,7 +1051,7 @@
 
 	function scoreCharacter(i, j, start, acro_score, csc_score) {
 
-	    // start of string / position of match bonus
+	    // init of string / position of match bonus
 	    var posBonus = scorePosition(i);
 
 	    // match IS a word boundary
@@ -827,12 +1077,15 @@
 	    var k = mi < nj ? mi : nj;
 
 	    var sameCase = 0;
-	    var sz = 0; //sz will be one more than the last qi is sj
 
 	    // query_lw[i] is subject_lw[j] has been checked before entering now do case sensitive check.
 	    if (query[j] === subject[i]) {
 	        sameCase++;
 	    }
+
+	    // size of consecutive
+	    // sz will be one more than the last index where query[j] == subject[i] (lowercase)
+	    var sz = 0;
 
 	    //Continue while lowercase char are the same, record when they are case-sensitive match.
 	    while (++sz < k && query_lw[++j] === subject_lw[++i]) {
@@ -858,13 +1111,13 @@
 
 	function scoreExactMatch(subject, subject_lw, query, query_lw, pos, n, m) {
 
-	    // Test for word start
+	    // Test for word init
 	    var start = isWordStart(pos, subject, subject_lw);
 
 	    // Heuristic
-	    // If not a word start, test next occurrence
+	    // If not a word init, test next occurrence
 	    // - We want exact match to be fast
-	    // - For exact match, word start has the biggest impact on score.
+	    // - For exact match, word init has the biggest impact on score.
 	    // - Testing 2 instances is somewhere between testing only one and testing every instances.
 
 	    if (!start) {
@@ -943,7 +1196,7 @@
 	        }
 
 	        // For other characters we search for the first match where subject[i] = query[j]
-	        // that also happens to be a start-of-word
+	        // that also happens to be a init-of-word
 
 	        while (++i < m) {
 	            if (qj_lw === subject_lw[i] && isWordStart(i, subject, subject_lw)) {
@@ -968,7 +1221,7 @@
 	        return emptyAcronymResult;
 	    }
 
-	    // Acronym are scored as start-of-word
+	    // Acronym are scored as init-of-word
 	    // Unless the acronym is a 1:1 match with candidate then it is upgraded to full-word.
 	    var fullWord = count === n ? isAcronymFullWord(subject, subject_lw, query, count) : false;
 	    var score = scorePattern(count, n, sameCase, true, fullWord);
@@ -1044,7 +1297,7 @@
 	        return 0;
 	    }
 	    var string_lw = string.toLowerCase();
-	    var score = (0, _scorer.computeScore)(string, string_lw, preparedQuery);
+	    var score = (0, _scorer.computeScore)(string, string_lw, options);
 	    score = scorePath(string, string_lw, score, options);
 	    return Math.ceil(score);
 	}
@@ -1098,7 +1351,7 @@
 
 	    //  Get basePath score, if BaseName is the whole string, no need to recompute
 	    //  We still need to apply the folder depth and filename penalty.
-	    var basePathScore = basePos === -1 ? fullPathScore : extAdjust * (0, _scorer.computeScore)(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery);
+	    var basePathScore = basePos === -1 ? fullPathScore : extAdjust * (0, _scorer.computeScore)(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), options);
 
 	    //  Final score is linear interpolation between base score and full path score.
 	    //  For low directory depth, interpolation favor base Path then include more of full path as depth increase
@@ -1123,7 +1376,7 @@
 	    var count = 0;
 	    var i = -1;
 
-	    // skip slash at the start so `foo/bar` and `/foo/bar` have the same depth.
+	    // skip slash at the init so `foo/bar` and `/foo/bar` have the same depth.
 	    while (++i < end && path[i] === pathSeparator) {}
 
 	    while (++i < end) {
@@ -1158,7 +1411,7 @@
 	        return 0;
 	    }
 
-	    //  Check that (a) extension exist, (b) it is after the start of the basename
+	    //  Check that (a) extension exist, (b) it is after the init of the basename
 	    var pos = candidate.lastIndexOf(".", endPos);
 	    if (pos <= startPos) {
 	        return 0;
@@ -1193,6 +1446,63 @@
 
 /***/ },
 /* 5 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	exports.__esModule = true;
+
+	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+	exports.isFunction = isFunction;
+	exports.isArray = isArray;
+	exports.getIterator = getIterator;
+	exports.default = {
+	    isFunction: isFunction,
+	    isArray: isArray,
+	    getIterator: getIterator
+	};
+	function isFunction(fn) {
+	    return typeof fn === "function";
+	}
+
+	function isArray(tentativeArray) {
+
+	    if (isFunction(Array.isArray)) {
+	        return Array.isArray(tentativeArray);
+	    }
+
+	    return Object.prototype.toString.call(tentativeArray) === "[object Array]";
+	}
+
+	//
+	// Es6 compatible iterator.
+	// Follow convention of ImmutableJS
+	//
+
+	var REAL_ITERATOR_SYMBOL = typeof Symbol === "function" && _typeof(Symbol.iterator) === "symbol" ? Symbol.iterator : null;
+	var FAUX_ITERATOR_SYMBOL = '@@iterator';
+
+	function getIterator(object) {
+
+	    // Implement real es6 iterator
+	    if (REAL_ITERATOR_SYMBOL != null && isFunction(object[REAL_ITERATOR_SYMBOL])) {
+	        return object[REAL_ITERATOR_SYMBOL]();
+	    }
+
+	    // es6 like but does not support symbol
+	    if (isFunction(object[REAL_ITERATOR_SYMBOL])) {
+	        return object[FAUX_ITERATOR_SYMBOL]();
+	    }
+
+	    // object itself is an iterator ( instead of having an iterator getter )
+	    //if(isFunction(object.next)){
+	    //    return object;
+	    //}
+	}
+
+/***/ },
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -1476,7 +1786,7 @@
 	            score_up = score_row[j]; // Current score_up is next run score diag
 	            csc_diag = csc_row[j];
 
-	            //In case of equality, moving UP get us closer to the start of the candidate string.
+	            //In case of equality, moving UP get us closer to the init of the candidate string.
 	            if (score > score_up) {
 	                move = LEFT;
 	            } else {
@@ -1536,7 +1846,7 @@
 	}
 
 /***/ },
-/* 6 */
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";

@@ -19,7 +19,7 @@ export function score(string, query, options) {
         return 0;
     }
     let string_lw = string.toLowerCase();
-    let score = computeScore(string, string_lw, preparedQuery);
+    let score = computeScore(string, string_lw, options);
     score = scorePath(string, string_lw, score, options);
     return Math.ceil(score);
 }
@@ -71,7 +71,7 @@ function scorePath(subject, subject_lw, fullPathScore, options) {
     //  Get basePath score, if BaseName is the whole string, no need to recompute
     //  We still need to apply the folder depth and filename penalty.
     let basePathScore = (basePos === -1) ? fullPathScore :
-    extAdjust * computeScore(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery);
+    extAdjust * computeScore(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), options);
 
     //  Final score is linear interpolation between base score and full path score.
     //  For low directory depth, interpolation favor base Path then include more of full path as depth increase
@@ -97,7 +97,7 @@ export function countDir(path, end, pathSeparator) {
     let count = 0;
     let i = -1;
 
-    // skip slash at the start so `foo/bar` and `/foo/bar` have the same depth.
+    // skip slash at the init so `foo/bar` and `/foo/bar` have the same depth.
     while (++i < end && path[i] === pathSeparator) {
     }
 
@@ -135,7 +135,7 @@ export function getExtensionScore(candidate, ext, startPos, endPos, maxDepth) {
         return 0;
     }
 
-    //  Check that (a) extension exist, (b) it is after the start of the basename
+    //  Check that (a) extension exist, (b) it is after the init of the basename
     let pos = candidate.lastIndexOf(".", endPos);
     if (pos <= startPos) {
         return 0;

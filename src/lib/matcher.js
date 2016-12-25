@@ -271,7 +271,7 @@ function computeMatch(subject, subject_lw, preparedQuery, offset = 0) {
             score_up = score_row[j]; // Current score_up is next run score diag
             csc_diag = csc_row[j];
 
-            //In case of equality, moving UP get us closer to the start of the candidate string.
+            //In case of equality, moving UP get us closer to the init of the candidate string.
             if (score > score_up) {
                 move = LEFT;
             } else {

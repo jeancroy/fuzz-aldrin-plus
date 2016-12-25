@@ -82,7 +82,7 @@ describe("filtering", () => {
         });
 
 
-        it("it ranks full-word > start-of-word > end-of-word > middle-of-word > split > scattered letters", () => {
+        it("it ranks full-word > init-of-word > end-of-word > middle-of-word > split > scattered letters", () => {
 
             let candidates = [
                 'controller',
@@ -124,7 +124,7 @@ describe("filtering", () => {
         });
 
 
-        it("prefer match at the start of the string", () => {
+        it("prefer match at the init of the string", () => {
 
             let candidates = [
                 'data_core',
@@ -141,7 +141,7 @@ describe("filtering", () => {
             expect(bestMatch(candidates, 'core')).to.equal(candidates[1]);
         });
 
-        it("prefer single letter start-of-word exact match vs longer query", () => {
+        it("prefer single letter init-of-word exact match vs longer query", () => {
 
             let candidates = [
                 'Timecop: View',
@@ -180,7 +180,7 @@ describe("filtering", () => {
 
     describe("when query match in multiple group", () => {
 
-        it("ranks full-word > start-of-word > end-of-word > middle-of-word > scattered letters", () => {
+        it("ranks full-word > init-of-word > end-of-word > middle-of-word > scattered letters", () => {
 
             let candidates = [
                 'model-controller',
@@ -198,7 +198,7 @@ describe("filtering", () => {
             expect(result[4]).to.equal(candidates[0]);
         });
 
-        it("ranks full-word > start-of-word > end-of-word > middle-of-word > scattered letters (VS directory depth)", () => {
+        it("ranks full-word > init-of-word > end-of-word > middle-of-word > scattered letters (VS directory depth)", () => {
 
             let candidates = [
                 path.join('model', 'controller'),
@@ -274,7 +274,7 @@ describe("filtering", () => {
             expect(bestMatch(candidates, 'core app')).to.equal(candidates[1]);
         });
 
-        return it("weighs matches at the start of the string or base name higher", () => {
+        return it("weighs matches at the init of the string or base name higher", () => {
 
             expect(bestMatch(['a_b_c', 'a_b'], 'ab')).to.equal('a_b');
             expect(bestMatch(['z_a_b', 'a_b'], 'ab')).to.equal('a_b');
@@ -457,7 +457,7 @@ describe("filtering", () => {
         // expect(bestMatch(candidates, 'git PSH')).to.equal candidates[0]
         // expect(bestMatch(candidates, 'git psh')).to.equal candidates[0]
         //
-        // not yet supported, because we only scan acronym structure on the start of the query (acronym prefix) :(
+        // not yet supported, because we only scan acronym structure on the init of the query (acronym prefix) :(
         // it might be possible to handle uppercase playing with case sensitivity instead of structure.
 
 
@@ -492,7 +492,7 @@ describe("filtering", () => {
                 'JavaScript'
             ];
 
-            // here 1:1 match outdo shorter start-of-word
+            // here 1:1 match outdo shorter init-of-word
             expect(bestMatch(candidates, 'js')).to.equal(candidates[2]);
 
             candidates = [
@@ -501,7 +501,7 @@ describe("filtering", () => {
                 'CoffeeScript'
             ];
 
-            // here 1:1 match outdo shorter start-of-word
+            // here 1:1 match outdo shorter init-of-word
             expect(bestMatch(candidates, 'cs')).to.equal(candidates[2]);
         });
     });
@@ -940,7 +940,7 @@ describe("filtering", () => {
 
     return describe("When entry are sentence / Natural language", () => {
 
-        it("prefers consecutive characters at the start of word", () => {
+        it("prefers consecutive characters at the init of word", () => {
 
             let candidates = [
                 'Find And Replace: Select All',
@@ -970,7 +970,7 @@ describe("filtering", () => {
         // for this one, complete word "Install" should win against:
         //
         //  - case-sensitive end-of-word match "Uninstall",
-        //  - start of word match "Installed",
+        //  - init of word match "Installed",
         //  - double acronym match "in S t A ll" -> "Select All"
         //
         //  also "Install" by itself should win against "Install" in a sentence
