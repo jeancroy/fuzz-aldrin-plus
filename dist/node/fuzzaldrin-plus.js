@@ -57,8 +57,10 @@ function filter(candidates, query, options) {
     if (!checkString(query)) return [];
     if (!checkCollection(candidates)) return [];
 
-    options = parseOptions(options, query);
-    return (0, _filter.filterSync)(candidates, query, options);
+    options = parseOptions(options);
+    var preparedQuery = getPreparedQuery(query, options);
+
+    return (0, _filter.filterSync)(candidates, preparedQuery, options);
 }
 
 /**
@@ -75,8 +77,10 @@ function filterAsync(candidates, query, callback, options) {
     if (!checkString(query)) return [];
     if (!checkCollection(candidates)) return [];
 
-    options = parseOptions(options, query);
-    return (0, _filter.filterAsync)(candidates, query, callback, options);
+    options = parseOptions(options);
+    var preparedQuery = getPreparedQuery(query, options);
+
+    return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
 }
 
 /**
@@ -99,12 +103,13 @@ function score(string, query, options) {
     if (!checkString(string)) return 0;
     if (!checkString(query)) return 0;
 
-    options = parseOptions(options, query);
+    options = parseOptions(options);
+    var preparedQuery = getPreparedQuery(query, options);
 
     if (options.usePathScoring) {
-        return (0, _pathScorer.score)(string, query, options);
+        return (0, _pathScorer.score)(string, preparedQuery, options);
     } else {
-        return (0, _scorer.score)(string, query, options);
+        return (0, _scorer.score)(string, preparedQuery, options);
     }
 }
 
@@ -135,8 +140,10 @@ function match(string, query, options) {
         return range;
     }
 
-    options = parseOptions(options, query);
-    return (0, _matcher.match)(string, query, options);
+    options = parseOptions(options);
+    var preparedQuery = getPreparedQuery(query, options);
+
+    return (0, _matcher.match)(string, preparedQuery, options);
 }
 
 /**
@@ -166,7 +173,9 @@ function wrap(string, query, options) {
     if (!checkString(string)) return "";
     if (!checkString(query)) return string;
 
-    options = parseOptions(options, query);
+    options = parseOptions(options);
+    var preparedQuery = getPreparedQuery(query, options);
+
     return (0, _matcher.wrap)(string, query, options);
 }
 
@@ -188,8 +197,8 @@ function wrap(string, query, options) {
  */
 
 function prepareQuery(query, options) {
-    options = parseOptions(options, query);
-    return options.preparedQuery;
+    options = parseOptions(options);
+    return getPreparedQuery(query, options);
 }
 
 function checkString(str) {
@@ -246,11 +255,10 @@ var defaultOptions = {
 /**
  *
  * @param {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options
- * @param {string} query
  * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
  */
 
-function parseOptions(options, query) {
+function parseOptions(options) {
 
     // If no options given, copy default
     // Else merge options with defaults.
@@ -264,17 +272,21 @@ function parseOptions(options, query) {
         }
     }
 
-    // if preparedQuery is given use it
-    // else assign from cache, recompute cache if needed
-    if (options.preparedQuery == null) {
+    return options;
+}
 
-        if (preparedQueryCache == null || preparedQueryCache.query !== query) {
-            preparedQueryCache = new _query.Query(query, options);
-        }
-        options.preparedQuery = preparedQueryCache;
+function getPreparedQuery(query, options) {
+
+    // If prepared query in option hash is valid, use it
+    if (options.preparedQuery != null && options.preparedQuery.query === query) return options.preparedQuery;
+
+    // Recompute cache if empty or invalid
+    if (preparedQueryCache == null || preparedQueryCache.query !== query) {
+        preparedQueryCache = new _query.Query(query, options);
     }
 
-    return options;
+    // Serve from cache
+    return preparedQueryCache;
 }
 
 //

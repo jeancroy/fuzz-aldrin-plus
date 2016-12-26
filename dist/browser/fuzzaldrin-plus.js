@@ -108,8 +108,10 @@
 	    if (!checkString(query)) return [];
 	    if (!checkCollection(candidates)) return [];
 
-	    options = parseOptions(options, query);
-	    return (0, _filter.filterSync)(candidates, query, options);
+	    options = parseOptions(options);
+	    var preparedQuery = getPreparedQuery(query, options);
+
+	    return (0, _filter.filterSync)(candidates, preparedQuery, options);
 	}
 
 	/**
@@ -126,8 +128,10 @@
 	    if (!checkString(query)) return [];
 	    if (!checkCollection(candidates)) return [];
 
-	    options = parseOptions(options, query);
-	    return (0, _filter.filterAsync)(candidates, query, callback, options);
+	    options = parseOptions(options);
+	    var preparedQuery = getPreparedQuery(query, options);
+
+	    return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
 	}
 
 	/**
@@ -150,12 +154,13 @@
 	    if (!checkString(string)) return 0;
 	    if (!checkString(query)) return 0;
 
-	    options = parseOptions(options, query);
+	    options = parseOptions(options);
+	    var preparedQuery = getPreparedQuery(query, options);
 
 	    if (options.usePathScoring) {
-	        return (0, _pathScorer.score)(string, query, options);
+	        return (0, _pathScorer.score)(string, preparedQuery, options);
 	    } else {
-	        return (0, _scorer.score)(string, query, options);
+	        return (0, _scorer.score)(string, preparedQuery, options);
 	    }
 	}
 
@@ -186,8 +191,10 @@
 	        return range;
 	    }
 
-	    options = parseOptions(options, query);
-	    return (0, _matcher.match)(string, query, options);
+	    options = parseOptions(options);
+	    var preparedQuery = getPreparedQuery(query, options);
+
+	    return (0, _matcher.match)(string, preparedQuery, options);
 	}
 
 	/**
@@ -217,7 +224,9 @@
 	    if (!checkString(string)) return "";
 	    if (!checkString(query)) return string;
 
-	    options = parseOptions(options, query);
+	    options = parseOptions(options);
+	    var preparedQuery = getPreparedQuery(query, options);
+
 	    return (0, _matcher.wrap)(string, query, options);
 	}
 
@@ -239,8 +248,8 @@
 	 */
 
 	function prepareQuery(query, options) {
-	    options = parseOptions(options, query);
-	    return options.preparedQuery;
+	    options = parseOptions(options);
+	    return getPreparedQuery(query, options);
 	}
 
 	function checkString(str) {
@@ -297,11 +306,10 @@
 	/**
 	 *
 	 * @param {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options
-	 * @param {string} query
 	 * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
 	 */
 
-	function parseOptions(options, query) {
+	function parseOptions(options) {
 
 	    // If no options given, copy default
 	    // Else merge options with defaults.
@@ -315,17 +323,21 @@
 	        }
 	    }
 
-	    // if preparedQuery is given use it
-	    // else assign from cache, recompute cache if needed
-	    if (options.preparedQuery == null) {
+	    return options;
+	}
 
-	        if (preparedQueryCache == null || preparedQueryCache.query !== query) {
-	            preparedQueryCache = new _query.Query(query, options);
-	        }
-	        options.preparedQuery = preparedQueryCache;
+	function getPreparedQuery(query, options) {
+
+	    // If prepared query in option hash is valid, use it
+	    if (options.preparedQuery != null && options.preparedQuery.query === query) return options.preparedQuery;
+
+	    // Recompute cache if empty or invalid
+	    if (preparedQueryCache == null || preparedQueryCache.query !== query) {
+	        preparedQueryCache = new _query.Query(query, options);
 	    }
 
-	    return options;
+	    // Serve from cache
+	    return preparedQueryCache;
 	}
 
 	//
@@ -433,32 +445,32 @@
 	/**
 	 *
 	 * @param {Array|Iterable} candidates
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {FilterOptions} options
 	 * @returns {Array}
 	 */
 
-	function filterSync(candidates, query, options) {
+	function filterSync(candidates, preparedQuery, options) {
 	    var state = new _filterState.FilterStateInternal();
-	    return executeFilter(candidates, query, state, options);
+	    return executeFilter(candidates, preparedQuery, state, options);
 	}
 
 	/**
 	 *
 	 * @param {Array|Iterable} candidates
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {FilterOptions} options
 	 * @param {filterCallback} callback
 	 * @returns {FilterState}
 	 */
 
-	function filterAsync(candidates, query, callback, options) {
+	function filterAsync(candidates, preparedQuery, callback, options) {
 
 	    var internalState = new _filterState.FilterStateInternal();
 	    var publicState = new _filterState.FilterState(internalState);
 
 	    var scheduled = function scheduled() {
-	        callback(executeFilter(candidates, query, internalState, options), publicState);
+	        callback(executeFilter(candidates, preparedQuery, internalState, options), publicState);
 	    };
 
 	    if (typeof setImmediate === "function") {
@@ -473,13 +485,13 @@
 	/**
 	 *
 	 * @param {Array|Iterable} candidates
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {FilterStateInternal} state
 	 * @param {FilterOptions} options
 	 * @returns {Array}
 	 */
 
-	function executeFilter(candidates, query, state, options) {
+	function executeFilter(candidates, preparedQuery, state, options) {
 
 	    if (state.shouldAbort) return [];
 
@@ -507,7 +519,7 @@
 	    state.scoredCandidates = [];
 
 	    // Iterate candidate list and collect scored positive matches.
-	    processCollection(candidates, query, state, options);
+	    processCollection(candidates, preparedQuery, state, options);
 
 	    // Collect positives matches
 	    var scoredCandidates = state.scoredCandidates;
@@ -536,7 +548,7 @@
 	    }
 	}
 
-	function processCollection(collection, query, state, options) {
+	function processCollection(collection, preparedQuery, state, options) {
 
 	    //
 	    // Collection is an array
@@ -544,7 +556,7 @@
 
 	    if (_utils2.default.isArray(collection)) {
 	        for (var i = 0; i <= collection.length; i++) {
-	            if (!processItem(collection[i], query, state, options)) break;
+	            if (!processItem(collection[i], preparedQuery, state, options)) break;
 	        }
 	        return true;
 	    }
@@ -558,7 +570,7 @@
 	        var item = iterator.next();
 	        if (_utils2.default.isIteratorItem(item)) {
 	            while (!item.done) {
-	                if (!processItem(item.value, query, state, options)) break;
+	                if (!processItem(item.value, preparedQuery, state, options)) break;
 	                item = iterator.next();
 	            }
 	            return true;
@@ -578,7 +590,7 @@
 	    var cont = true;
 	    if (_utils2.default.isFunction(collection.forEach)) {
 	        collection.forEach(function (item) {
-	            return cont = cont && processItem(item, query, state, options);
+	            return cont = cont && processItem(item, preparedQuery, state, options);
 	        });
 	        return true;
 	    }
@@ -589,13 +601,13 @@
 	/**
 	 *
 	 * @param {string|object} candidate
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {FilterStateInternal} context
 	 * @param {FilterOptions} options
 	 * @returns {boolean}
 	 */
 
-	function processItem(candidate, query, context, options) {
+	function processItem(candidate, preparedQuery, context, options) {
 
 	    if (context.shouldAbort) return false;
 	    context.count++;
@@ -610,7 +622,7 @@
 	    if (string == null || !string.length) return true;
 
 	    // Get score, If score greater than 0 add to valid results
-	    var score = scoreProvider.score(string, query, options);
+	    var score = scoreProvider.score(string, preparedQuery, options);
 	    if (score > 0) scoredCandidates.push({ candidate: candidate, score: score });
 
 	    return true;
@@ -692,15 +704,14 @@
 	// Manage the logic of testing if there's a match and calling the main scoring function
 	// Also manage scoring a path and optional character.
 
-	function score(string, query, options) {
-	    var preparedQuery = options.preparedQuery,
-	        allowErrors = options.allowErrors;
+	function score(string, preparedQuery, options) {
+	    var allowErrors = options.allowErrors;
 
 	    if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {
 	        return 0;
 	    }
 	    var string_lw = string.toLowerCase();
-	    var score = computeScore(string, string_lw, options);
+	    var score = computeScore(string, string_lw, preparedQuery, options);
 	    return Math.ceil(score);
 	}
 
@@ -750,8 +761,7 @@
 	// Main scoring algorithm
 	//
 
-	function computeScore(subject, subject_lw, options) {
-	    var preparedQuery = options.preparedQuery;
+	function computeScore(subject, subject_lw, preparedQuery, options) {
 	    var query = preparedQuery.query,
 	        query_lw = preparedQuery.query_lw;
 
@@ -1248,16 +1258,15 @@
 	//  Manage the logic of testing if there's a match and calling the main scoring function
 	//  Also manage scoring a path and optional character.
 
-	function score(string, query, options) {
-	    var preparedQuery = options.preparedQuery,
-	        allowErrors = options.allowErrors;
+	function score(string, preparedQuery, options) {
+	    var allowErrors = options.allowErrors;
 
 	    if (!allowErrors && !(0, _scorer.isMatch)(string, preparedQuery.core_lw, preparedQuery.core_up)) {
 	        return 0;
 	    }
 	    var string_lw = string.toLowerCase();
-	    var score = (0, _scorer.computeScore)(string, string_lw, options);
-	    score = scorePath(string, string_lw, score, options);
+	    var score = (0, _scorer.computeScore)(string, string_lw, preparedQuery, options);
+	    score = scorePath(string, string_lw, score, preparedQuery, options);
 	    return Math.ceil(score);
 	}
 
@@ -1265,14 +1274,13 @@
 	//  Score adjustment for path
 	// 
 
-	function scorePath(subject, subject_lw, fullPathScore, options) {
+	function scorePath(subject, subject_lw, fullPathScore, preparedQuery, options) {
 
 	    if (fullPathScore === 0) {
 	        return 0;
 	    }
 
-	    var preparedQuery = options.preparedQuery,
-	        useExtensionBonus = options.useExtensionBonus,
+	    var useExtensionBonus = options.useExtensionBonus,
 	        pathSeparator = options.pathSeparator;
 
 	    //  Skip trailing slashes
@@ -1310,7 +1318,7 @@
 
 	    //  Get basePath score, if BaseName is the whole string, no need to recompute
 	    //  We still need to apply the folder depth and filename penalty.
-	    var basePathScore = basePos === -1 ? fullPathScore : extAdjust * (0, _scorer.computeScore)(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), options);
+	    var basePathScore = basePos === -1 ? fullPathScore : extAdjust * (0, _scorer.computeScore)(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery, options);
 
 	    //  Final score is linear interpolation between base score and full path score.
 	    //  For low directory depth, interpolation favor base Path then include more of full path as depth increase
@@ -1562,7 +1570,7 @@
 	/**
 	 *
 	 * @param {string} string
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {MatchOptions} options
 	 * @returns {Array.<number>}
 	 */
@@ -1570,9 +1578,8 @@
 	// This file should closely follow `scorer` except that it returns an array
 	// of indexes instead of a score.
 
-	function match(string, query, options) {
+	function match(string, preparedQuery, options) {
 	    var allowErrors = options.allowErrors,
-	        preparedQuery = options.preparedQuery,
 	        pathSeparator = options.pathSeparator;
 
 
@@ -1610,22 +1617,22 @@
 	/**
 	 *
 	 * @param {string} string
-	 * @param {string} query
+	 * @param {Query} preparedQuery
 	 * @param {WrapOptions} options
 	 * @returns {*}
 	 */
-	function wrap(string, query, options) {
+	function wrap(string, preparedQuery, options) {
 
 	    var tagClass = options.tagClass || 'highlight';
 	    var tagOpen = options.tagOpen || '<strong class="' + tagClass + '">';
 	    var tagClose = options.tagClose || '</strong>';
 
-	    if (string === options.preparedQuery.query) {
+	    if (string === preparedQuery.query) {
 	        return tagOpen + string + tagClose;
 	    }
 
 	    //Run get position where a match is found
-	    var matchPositions = match(string, query, options);
+	    var matchPositions = match(string, preparedQuery, options);
 	    var nbMatches = matchPositions.length;
 
 	    //If no match return as is
@@ -1918,11 +1925,7 @@
 	//
 
 
-	var Query = exports.Query = function Query(query) {
-	    var _ref = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
-	        optCharRegEx = _ref.optCharRegEx,
-	        pathSeparator = _ref.pathSeparator;
-
+	var Query = exports.Query = function Query(query, options) {
 	    _classCallCheck(this, Query);
 
 	    if (query == null || !query.length) {
@@ -1931,10 +1934,10 @@
 
 	    this.query = query;
 	    this.query_lw = query.toLowerCase();
-	    this.core = coreChars(query, optCharRegEx);
+	    this.core = coreChars(query, options.optCharRegEx);
 	    this.core_lw = this.core.toLowerCase();
 	    this.core_up = truncatedUpperCase(this.core);
-	    this.depth = (0, _pathScorer.countDir)(query, query.length, pathSeparator);
+	    this.depth = (0, _pathScorer.countDir)(query, query.length, options.pathSeparator);
 	    this.ext = (0, _pathScorer.getExtension)(this.query_lw);
 	    this.charCodes = getCharCodes(this.query_lw);
 	};
@@ -1971,18 +1974,18 @@
 	function truncatedUpperCase(str) {
 	    var upper = "";
 	    for (var _iterator = str, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[Symbol.iterator]();;) {
-	        var _ref2;
+	        var _ref;
 
 	        if (_isArray) {
 	            if (_i >= _iterator.length) break;
-	            _ref2 = _iterator[_i++];
+	            _ref = _iterator[_i++];
 	        } else {
 	            _i = _iterator.next();
 	            if (_i.done) break;
-	            _ref2 = _i.value;
+	            _ref = _i.value;
 	        }
 
-	        var char = _ref2;
+	        var char = _ref;
 
 	        upper += char.toUpperCase()[0];
 	    }
