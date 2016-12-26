@@ -8,7 +8,7 @@ import {countDir, getExtension} from "./pathScorer";
 
 export class Query {
 
-    constructor(query, {optCharRegEx, pathSeparator} = {}) {
+    constructor(query, options) {
 
         if (query == null || !query.length) {
             return;
@@ -16,10 +16,10 @@ export class Query {
 
         this.query = query;
         this.query_lw = query.toLowerCase();
-        this.core = coreChars(query, optCharRegEx);
+        this.core = coreChars(query, options.optCharRegEx);
         this.core_lw = this.core.toLowerCase();
         this.core_up = truncatedUpperCase(this.core);
-        this.depth = countDir(query, query.length, pathSeparator);
+        this.depth = countDir(query, query.length, options.pathSeparator);
         this.ext = getExtension(this.query_lw);
         this.charCodes = getCharCodes(this.query_lw);
     }

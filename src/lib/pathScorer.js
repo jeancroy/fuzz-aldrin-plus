@@ -13,14 +13,14 @@ export default{
 //  Manage the logic of testing if there's a match and calling the main scoring function
 //  Also manage scoring a path and optional character.
 
-export function score(string, query, options) {
-    let {preparedQuery, allowErrors} = options;
+export function score(string, preparedQuery, options) {
+    let {allowErrors} = options;
     if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {
         return 0;
     }
     let string_lw = string.toLowerCase();
-    let score = computeScore(string, string_lw, options);
-    score = scorePath(string, string_lw, score, options);
+    let score = computeScore(string, string_lw, preparedQuery, options);
+    score = scorePath(string, string_lw, score, preparedQuery, options);
     return Math.ceil(score);
 }
 
@@ -29,13 +29,13 @@ export function score(string, query, options) {
 //  Score adjustment for path
 // 
 
-function scorePath(subject, subject_lw, fullPathScore, options) {
+function scorePath(subject, subject_lw, fullPathScore, preparedQuery, options) {
 
     if (fullPathScore === 0) {
         return 0;
     }
 
-    let {preparedQuery, useExtensionBonus, pathSeparator} = options;
+    let {useExtensionBonus, pathSeparator} = options;
 
     //  Skip trailing slashes
     let end = subject.length - 1;
@@ -71,7 +71,7 @@ function scorePath(subject, subject_lw, fullPathScore, options) {
     //  Get basePath score, if BaseName is the whole string, no need to recompute
     //  We still need to apply the folder depth and filename penalty.
     let basePathScore = (basePos === -1) ? fullPathScore :
-    extAdjust * computeScore(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), options);
+    extAdjust * computeScore(subject.slice(basePos + 1, end + 1), subject_lw.slice(basePos + 1, end + 1), preparedQuery, options);
 
     //  Final score is linear interpolation between base score and full path score.
     //  For low directory depth, interpolation favor base Path then include more of full path as depth increase

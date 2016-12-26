@@ -15,13 +15,13 @@ export default{
 /**
  *
  * @param {string} string
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {MatchOptions} options
  * @returns {Array.<number>}
  */
-export function match(string, query, options) {
+export function match(string, preparedQuery, options) {
 
-    let {allowErrors, preparedQuery, pathSeparator} = options;
+    let {allowErrors, pathSeparator} = options;
 
     if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {
         return [];
@@ -58,22 +58,22 @@ export function match(string, query, options) {
 /**
  *
  * @param {string} string
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {WrapOptions} options
  * @returns {*}
  */
-export function wrap(string, query, options) {
+export function wrap(string, preparedQuery, options) {
 
     let tagClass = options.tagClass ||  'highlight';
     let tagOpen = options.tagOpen || `<strong class="${tagClass}">`;
     let tagClose = options.tagClose || '</strong>';
 
-    if (string === options.preparedQuery.query) {
+    if (string === preparedQuery.query) {
         return tagOpen + string + tagClose;
     }
 
     //Run get position where a match is found
-    let matchPositions = match(string,query, options);
+    let matchPositions = match(string, preparedQuery, options);
     let nbMatches = matchPositions.length;
 
     //If no match return as is

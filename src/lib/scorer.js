@@ -45,13 +45,13 @@ export default{
 // Manage the logic of testing if there's a match and calling the main scoring function
 // Also manage scoring a path and optional character.
 
-export function score(string, query, options) {
-    let {preparedQuery, allowErrors} = options;
+export function score(string, preparedQuery, options) {
+    let {allowErrors} = options;
     if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {
         return 0;
     }
     let string_lw = string.toLowerCase();
-    let score = computeScore(string, string_lw, options);
+    let score = computeScore(string, string_lw, preparedQuery, options);
     return Math.ceil(score);
 }
 
@@ -103,8 +103,7 @@ export function isMatch(subject, query_lw, query_up) {
 // Main scoring algorithm
 //
 
-export function computeScore(subject, subject_lw, options) {
-    let {preparedQuery} = options;
+export function computeScore(subject, subject_lw, preparedQuery, options) {
     let {query, query_lw} = preparedQuery;
     let flexUppercase = true;
 

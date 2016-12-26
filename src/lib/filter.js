@@ -12,33 +12,33 @@ export default {
 /**
  *
  * @param {Array|Iterable} candidates
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {FilterOptions} options
  * @returns {Array}
  */
 
-export function filterSync(candidates, query,  options) {
+export function filterSync(candidates, preparedQuery,  options) {
     let state = new FilterStateInternal();
-    return executeFilter(candidates, query, state, options)
+    return executeFilter(candidates, preparedQuery, state, options)
 }
 
 /**
  *
  * @param {Array|Iterable} candidates
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {FilterOptions} options
  * @param {filterCallback} callback
  * @returns {FilterState}
  */
 
 
-export function filterAsync(candidates, query,  callback, options) {
+export function filterAsync(candidates, preparedQuery,  callback, options) {
 
     let internalState = new FilterStateInternal();
     let publicState = new FilterState(internalState);
 
     let scheduled = () => {
-        callback( executeFilter(candidates, query, internalState, options), publicState );
+        callback( executeFilter(candidates, preparedQuery, internalState, options), publicState );
     };
 
     if(typeof setImmediate === "function"){
@@ -54,13 +54,13 @@ export function filterAsync(candidates, query,  callback, options) {
 /**
  *
  * @param {Array|Iterable} candidates
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {FilterStateInternal} state
  * @param {FilterOptions} options
  * @returns {Array}
  */
 
-function executeFilter(candidates, query, state, options) {
+function executeFilter(candidates, preparedQuery, state, options) {
 
     if(state.shouldAbort) return [];
 
@@ -82,7 +82,7 @@ function executeFilter(candidates, query, state, options) {
     state.scoredCandidates = [];
 
     // Iterate candidate list and collect scored positive matches.
-    processCollection(candidates, query, state, options);
+    processCollection(candidates, preparedQuery, state, options);
 
     // Collect positives matches
     let scoredCandidates = state.scoredCandidates;
@@ -112,7 +112,7 @@ function executeFilter(candidates, query, state, options) {
 
 }
 
-function processCollection(collection, query, state, options){
+function processCollection(collection, preparedQuery, state, options){
 
     //
     // Collection is an array
@@ -120,7 +120,7 @@ function processCollection(collection, query, state, options){
 
     if( utils.isArray(collection) ){
         for(let i = 0; i<= collection.length; i++){
-            if( !processItem( collection[i], query, state, options) ) break;
+            if( !processItem( collection[i], preparedQuery, state, options) ) break;
         }
         return true;
     }
@@ -134,7 +134,7 @@ function processCollection(collection, query, state, options){
         let item = iterator.next();
         if(utils.isIteratorItem(item)){
             while(!item.done){
-                if( !processItem( item.value, query, state, options) ) break;
+                if( !processItem( item.value, preparedQuery, state, options) ) break;
                 item = iterator.next()
             }
             return true;
@@ -153,7 +153,7 @@ function processCollection(collection, query, state, options){
 
     let cont = true;
     if( utils.isFunction(collection.forEach) ) {
-        collection.forEach((item) => cont = cont && processItem(item, query, state, options));
+        collection.forEach((item) => cont = cont && processItem(item, preparedQuery, state, options));
         return true;
     }
 
@@ -163,13 +163,13 @@ function processCollection(collection, query, state, options){
 /**
  *
  * @param {string|object} candidate
- * @param {string} query
+ * @param {Query} preparedQuery
  * @param {FilterStateInternal} context
  * @param {FilterOptions} options
  * @returns {boolean}
  */
 
-function processItem(candidate, query, context, options){
+function processItem(candidate, preparedQuery, context, options){
 
     if(context.shouldAbort) return false;
     context.count++;
@@ -181,7 +181,7 @@ function processItem(candidate, query, context, options){
     if (string == null || !string.length) return true;
 
     // Get score, If score greater than 0 add to valid results
-    let score = scoreProvider.score(string, query, options);
+    let score = scoreProvider.score(string, preparedQuery, options);
     if (score > 0) scoredCandidates.push({candidate, score});
 
     return true;
