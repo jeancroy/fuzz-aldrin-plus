@@ -1,7 +1,8 @@
 export default {
     isFunction,
     isArray,
-    getIterator
+    getIterator,
+    isIteratorItem
 };
 
 export function isFunction(fn){
@@ -28,19 +29,32 @@ const FAUX_ITERATOR_SYMBOL = '@@iterator';
 
 export function getIterator(object){
 
-    // Implement real es6 iterator
+    if(object == null) return null;
+
+    // Get iterator from Iterable
+    let iterator = null;
     if(REAL_ITERATOR_SYMBOL != null && isFunction(object[REAL_ITERATOR_SYMBOL]) ) {
-        return object[REAL_ITERATOR_SYMBOL]();
+        // real es6 Iterable
+        iterator =  object[REAL_ITERATOR_SYMBOL]();
+    }
+    else if( isFunction(object[REAL_ITERATOR_SYMBOL]) ){
+        // es < 6 fallback.
+        iterator = object[FAUX_ITERATOR_SYMBOL]();
     }
 
-    // es6 like but does not support symbol
-    if( isFunction(object[REAL_ITERATOR_SYMBOL]) ){
-        return object[FAUX_ITERATOR_SYMBOL]();
+    // Ensure that that iterator implements 'next' function
+    if(iterator != null && isFunction(iterator.next))
+        return iterator;
+
+    // Test if object itself is iterator-like
+    if(isFunction(object.next)){
+        return object;
     }
 
-    // object itself is an iterator ( instead of having an iterator getter )
-    //if(isFunction(object.next)){
-    //    return object;
-    //}
+    return null;
 
+}
+
+export function isIteratorItem(item){
+    return  item != null && 'done' in item && 'value' in item
 }

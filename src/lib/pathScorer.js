@@ -95,18 +95,30 @@ export function countDir(path, end, pathSeparator) {
     }
 
     let count = 0;
-    let i = -1;
+    let i = 0;
 
-    // skip slash at the init so `foo/bar` and `/foo/bar` have the same depth.
-    while (++i < end && path[i] === pathSeparator) {
+    // skip slash at the start of string
+    // so `foo/bar` and `/foo/bar` have the same depth.
+    while (i < end && path[i] === pathSeparator){
+        i++;
     }
 
-    while (++i < end) {
+    // scan for path separator
+    while (i < end) {
+
         if (path[i] === pathSeparator) {
-            count++; // record first slash, but then skip consecutive ones
-            while (++i < end && path[i] === pathSeparator) {
+
+            //When path found increase directory depth
+            count++;
+
+            //But treat multiple consecutive pathSeparator as one
+            while (i < end && path[i] === pathSeparator) {
+                i++;
             }
         }
+
+        i++;
+
     }
 
     return count;

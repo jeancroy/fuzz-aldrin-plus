@@ -1,11 +1,11 @@
 'use strict';
 
 const webpack = require('webpack');
-const path = require('path');
 const commonConfig = require('./webpack.config');
 const pkg = require('./package.json');
 
-const bannerStr = "" + pkg.name + " - v " + pkg.version + " - @license: " + pkg.license + "; @author: Jean Christophe Roy; @site: " + pkg.homepage + "";
+const bannerStr = "" + pkg.name + " - v " + pkg.version + " - @license: " + pkg.license
+      + "; @author: Jean Christophe Roy; @site: " + pkg.homepage + "";
 
 module.exports = (options) => {
   const releaseConfig = Object.create(commonConfig(options));

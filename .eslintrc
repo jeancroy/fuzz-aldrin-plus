@@ -23,6 +23,7 @@
     "indent": [ "error", 4 ],
     "comma-dangle": 0,
     "linebreak-style": 0,
+    "no-inline-comments":0,
 
     // strings
     "quotes": 0,
@@ -36,7 +37,7 @@
     "prefer-const": 1,
 
     // keep it simple
-    "complexity": [ 1, 5 ],
+    "complexity": [ 1, 10 ],
     "max-len": [1, 150]
   }
 

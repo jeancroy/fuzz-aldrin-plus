@@ -200,6 +200,7 @@ function checkString(str) {
 function checkCollection(obj) {
     // Not null
     // If object has length or size property, must be != 0
+    // Example of thing with size: (es6 sets, ImmutableJs collections)
     return obj != null && obj.length !== 0 && obj.size !== 0;
 }
 

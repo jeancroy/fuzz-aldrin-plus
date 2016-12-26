@@ -70,9 +70,9 @@
 
 	var _pathScorer = __webpack_require__(4);
 
-	var _matcher = __webpack_require__(6);
+	var _matcher = __webpack_require__(7);
 
-	var _query = __webpack_require__(7);
+	var _query = __webpack_require__(8);
 
 	var fuzzaldrin = {
 	    filter: filter,
@@ -251,6 +251,7 @@
 	function checkCollection(obj) {
 	    // Not null
 	    // If object has length or size property, must be != 0
+	    // Example of thing with size: (es6 sets, ImmutableJs collections)
 	    return obj != null && obj.length !== 0 && obj.size !== 0;
 	}
 
@@ -405,7 +406,6 @@
 	"use strict";
 
 	exports.__esModule = true;
-	exports.FilterState = undefined;
 	exports.filterSync = filterSync;
 	exports.filterAsync = filterAsync;
 
@@ -421,9 +421,9 @@
 
 	var _utils2 = _interopRequireDefault(_utils);
 
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	var _filterState = __webpack_require__(6);
 
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	exports.default = {
 	    filterSync: filterSync,
@@ -439,7 +439,7 @@
 	 */
 
 	function filterSync(candidates, query, options) {
-	    var state = new FilterStateInternal();
+	    var state = new _filterState.FilterStateInternal();
 	    return executeFilter(candidates, query, state, options);
 	}
 
@@ -454,8 +454,8 @@
 
 	function filterAsync(candidates, query, callback, options) {
 
-	    var internalState = new FilterStateInternal();
-	    var publicState = new FilterState(internalState);
+	    var internalState = new _filterState.FilterStateInternal();
+	    var publicState = new _filterState.FilterState(internalState);
 
 	    var scheduled = function scheduled() {
 	        callback(executeFilter(candidates, query, internalState, options), publicState);
@@ -489,11 +489,10 @@
 	        outputScore = options.outputScore,
 	        usePathScoring = options.usePathScoring;
 
-	    var scoreProvider = usePathScoring ? _pathScorer2.default : _scorer2.default;
-
 	    // If list of object, we need to get the string to be scored, as defined by options.key
 	    // If the key is a method, that method should take an object and return the string.
 	    // Else we assume it is the name of a property on candidate object.
+
 	    var accessor = null;
 	    if (key != null) {
 	        accessor = _utils2.default.isFunction(options.key) ? options.key : function (x) {
@@ -504,7 +503,7 @@
 	    // Init state
 	    state.isActive = true;
 	    state.accessor = accessor;
-	    state.scoreProvider = scoreProvider;
+	    state.scoreProvider = usePathScoring ? _pathScorer2.default : _scorer2.default;
 	    state.scoredCandidates = [];
 
 	    // Iterate candidate list and collect scored positive matches.
@@ -518,7 +517,7 @@
 	    state.isActive = false;
 
 	    // Quick exit
-	    if (state.shouldAbort || scoredCandidates == null || !scoredCandidates.length) return [];
+	    if (state.discardResults || scoredCandidates == null || !scoredCandidates.length) return [];
 
 	    // Sort scores in descending order
 	    scoredCandidates.sort(sortCandidates);
@@ -528,6 +527,7 @@
 	        scoredCandidates = scoredCandidates.slice(0, maxResults);
 	    }
 
+	    // Return either a sorted list of candidate or list of candidate-score pairs.
 	    if (outputScore === true) {
 	        return scoredCandidates;
 	    } else {
@@ -546,23 +546,23 @@
 	        for (var i = 0; i <= collection.length; i++) {
 	            if (!processItem(collection[i], query, state, options)) break;
 	        }
-
-	        return;
+	        return true;
 	    }
 
 	    //
-	    // Collection implements es6 iterator protocol
+	    // Collection is an Iterable or Iterator (es6 protocol)
 	    //
 
 	    var iterator = _utils2.default.getIterator(collection);
 	    if (iterator != null) {
-	        var item = void 0;
-	        while (item = iterator.next()) {
-	            if (item.done) break;
-	            if (!processItem(item.value, query, state, options)) break;
+	        var item = iterator.next();
+	        if (_utils2.default.isIteratorItem(item)) {
+	            while (!item.done) {
+	                if (!processItem(item.value, query, state, options)) break;
+	                item = iterator.next();
+	            }
+	            return true;
 	        }
-
-	        return;
 	    }
 
 	    //
@@ -580,7 +580,10 @@
 	        collection.forEach(function (item) {
 	            return cont = cont && processItem(item, query, state, options);
 	        });
+	        return true;
 	    }
+
+	    return false;
 	}
 
 	/**
@@ -604,15 +607,11 @@
 	    // Get the string representation of candidate
 
 	    var string = accessor != null ? accessor(candidate) : candidate;
-	    if (string == null || !string.length) {
-	        return true;
-	    }
+	    if (string == null || !string.length) return true;
 
 	    // Get score, If score greater than 0 add to valid results
 	    var score = scoreProvider.score(string, query, options);
-	    if (score > 0) {
-	        scoredCandidates.push({ candidate: candidate, score: score });
-	    }
+	    if (score > 0) scoredCandidates.push({ candidate: candidate, score: score });
 
 	    return true;
 	}
@@ -624,46 +623,6 @@
 	function sortCandidates(a, b) {
 	    return b.score - a.score;
 	}
-
-	var FilterStateInternal = function FilterStateInternal() {
-	    _classCallCheck(this, FilterStateInternal);
-
-	    this.isActive = false;
-	    this.shouldAbort = false;
-	    this.count = 0;
-	    this.scoredCandidates = null;
-	    this.accessor = null;
-	    this.scoreProvider = null;
-	};
-
-	var FilterState =
-
-	/**
-	 * @param {FilterStateInternal} internalState
-	 */
-
-	exports.FilterState = function FilterState(internalState) {
-	    _classCallCheck(this, FilterState);
-
-	    // Closure over the internal state to make it read-only.
-
-	    this.abort = function () {
-	        internalState.isActive = false;
-	        internalState.shouldAbort = true;
-	    };
-
-	    this.isActive = function () {
-	        return internalState.isActive;
-	    };
-
-	    this.isCanceled = function () {
-	        return internalState.shouldAbort;
-	    };
-
-	    this.getProgressCount = function () {
-	        return internalState.count;
-	    };
-	};
 
 /***/ },
 /* 3 */
@@ -1374,16 +1333,29 @@
 	    }
 
 	    var count = 0;
-	    var i = -1;
+	    var i = 0;
 
-	    // skip slash at the init so `foo/bar` and `/foo/bar` have the same depth.
-	    while (++i < end && path[i] === pathSeparator) {}
+	    // skip slash at the start of string
+	    // so `foo/bar` and `/foo/bar` have the same depth.
+	    while (i < end && path[i] === pathSeparator) {
+	        i++;
+	    }
 
-	    while (++i < end) {
+	    // scan for path separator
+	    while (i < end) {
+
 	        if (path[i] === pathSeparator) {
-	            count++; // record first slash, but then skip consecutive ones
-	            while (++i < end && path[i] === pathSeparator) {}
+
+	            //When path found increase directory depth
+	            count++;
+
+	            //But treat multiple consecutive pathSeparator as one
+	            while (i < end && path[i] === pathSeparator) {
+	                i++;
+	            }
 	        }
+
+	        i++;
 	    }
 
 	    return count;
@@ -1457,10 +1429,12 @@
 	exports.isFunction = isFunction;
 	exports.isArray = isArray;
 	exports.getIterator = getIterator;
+	exports.isIteratorItem = isIteratorItem;
 	exports.default = {
 	    isFunction: isFunction,
 	    isArray: isArray,
-	    getIterator: getIterator
+	    getIterator: getIterator,
+	    isIteratorItem: isIteratorItem
 	};
 	function isFunction(fn) {
 	    return typeof fn === "function";
@@ -1485,24 +1459,89 @@
 
 	function getIterator(object) {
 
-	    // Implement real es6 iterator
+	    if (object == null) return null;
+
+	    // Get iterator from Iterable
+	    var iterator = null;
 	    if (REAL_ITERATOR_SYMBOL != null && isFunction(object[REAL_ITERATOR_SYMBOL])) {
-	        return object[REAL_ITERATOR_SYMBOL]();
+	        // real es6 Iterable
+	        iterator = object[REAL_ITERATOR_SYMBOL]();
+	    } else if (isFunction(object[REAL_ITERATOR_SYMBOL])) {
+	        // es < 6 fallback.
+	        iterator = object[FAUX_ITERATOR_SYMBOL]();
 	    }
 
-	    // es6 like but does not support symbol
-	    if (isFunction(object[REAL_ITERATOR_SYMBOL])) {
-	        return object[FAUX_ITERATOR_SYMBOL]();
+	    // Ensure that that iterator implements 'next' function
+	    if (iterator != null && isFunction(iterator.next)) return iterator;
+
+	    // Test if object itself is iterator-like
+	    if (isFunction(object.next)) {
+	        return object;
 	    }
 
-	    // object itself is an iterator ( instead of having an iterator getter )
-	    //if(isFunction(object.next)){
-	    //    return object;
-	    //}
+	    return null;
+	}
+
+	function isIteratorItem(item) {
+	    return item != null && 'done' in item && 'value' in item;
 	}
 
 /***/ },
 /* 6 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	exports.__esModule = true;
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	var FilterStateInternal = exports.FilterStateInternal = function FilterStateInternal() {
+	    _classCallCheck(this, FilterStateInternal);
+
+	    this.isActive = false;
+	    this.shouldAbort = false;
+	    this.discardResults = false;
+	    this.count = 0;
+	    this.scoredCandidates = null;
+	    this.accessor = null;
+	    this.scoreProvider = null;
+	};
+
+	var FilterState =
+
+	/**
+	 * @param {FilterStateInternal} internalState
+	 */
+
+	exports.FilterState = function FilterState(internalState) {
+	    _classCallCheck(this, FilterState);
+
+	    // Closure over the internal state to make it read-only.
+
+	    this.abort = function abort() {
+	        var keepResults = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+
+	        internalState.isActive = false;
+	        internalState.shouldAbort = true;
+	        internalState.discardResults = !keepResults;
+	    };
+
+	    this.isActive = function isActive() {
+	        return internalState.isActive;
+	    };
+
+	    this.isCanceled = function isCanceled() {
+	        return internalState.shouldAbort;
+	    };
+
+	    this.getProgressCount = function getProgressCount() {
+	        return internalState.count;
+	    };
+	};
+
+/***/ },
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -1520,6 +1559,13 @@
 
 	// Return position of character which matches
 
+	/**
+	 *
+	 * @param {string} string
+	 * @param {string} query
+	 * @param {MatchOptions} options
+	 * @returns {Array.<number>}
+	 */
 	// A match list is an array of indexes to characters that match.
 	// This file should closely follow `scorer` except that it returns an array
 	// of indexes instead of a score.
@@ -1561,21 +1607,29 @@
 	//
 	// Helper around match if you want a string with result wrapped by some delimiter text
 
+	/**
+	 *
+	 * @param {string} string
+	 * @param {string} query
+	 * @param {WrapOptions} options
+	 * @returns {*}
+	 */
 	function wrap(string, query, options) {
 
 	    var tagClass = options.tagClass || 'highlight';
 	    var tagOpen = options.tagOpen || '<strong class="' + tagClass + '">';
 	    var tagClose = options.tagClose || '</strong>';
 
-	    if (string === query) {
+	    if (string === options.preparedQuery.query) {
 	        return tagOpen + string + tagClose;
 	    }
 
 	    //Run get position where a match is found
 	    var matchPositions = match(string, query, options);
+	    var nbMatches = matchPositions.length;
 
 	    //If no match return as is
-	    if (matchPositions.length === 0) {
+	    if (nbMatches === 0) {
 	        return string;
 	    }
 
@@ -1583,7 +1637,7 @@
 	    var output = '';
 	    var matchIndex = -1;
 	    var strPos = 0;
-	    while (++matchIndex < matchPositions.length) {
+	    while (++matchIndex < nbMatches) {
 	        var matchPos = matchPositions[matchIndex];
 
 	        // Get text before the current match position
@@ -1593,7 +1647,7 @@
 	        }
 
 	        // Get consecutive matches to wrap under a single tag
-	        while (++matchIndex < matchPositions.length) {
+	        while (++matchIndex < nbMatches) {
 	            if (matchPositions[matchIndex] === matchPos + 1) {
 	                matchPos++;
 	            } else {
@@ -1846,7 +1900,7 @@
 	}
 
 /***/ },
-/* 7 */
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -1885,8 +1939,6 @@
 	    this.charCodes = getCharCodes(this.query_lw);
 	};
 
-	;
-
 	//
 	// Optional chars
 	// Those char improve the score if present, but will not block the match (score=0) if absent.
@@ -1907,11 +1959,12 @@
 	// --------------------
 	//
 	// A fundamental mechanic is that we are able to keep uppercase and lowercase variant of the strings in sync.
-	// For that we assume uppercase and lowercase version of the string have the same length. Of course unicode being unicode there's exceptions.
+	// For that we assume uppercase and lowercase version of the string have the same length.
+	// Of course unicode being unicode there's exceptions.
 	// See ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt for the list
 	//
-	// "Stra�e".toUpperCase() -> "STRASSE"
-	// truncatedUpperCase("Stra�e") -> "STRASE"
+	// "Straße".toUpperCase() -> "STRASSE"
+	// truncatedUpperCase("Straße") -> "STRASE"
 	// iterating over every character, getting uppercase variant and getting first char of that.
 	//
 

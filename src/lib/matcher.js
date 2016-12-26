@@ -12,6 +12,13 @@ export default{
 
 // Return position of character which matches
 
+/**
+ *
+ * @param {string} string
+ * @param {string} query
+ * @param {MatchOptions} options
+ * @returns {Array.<number>}
+ */
 export function match(string, query, options) {
 
     let {allowErrors, preparedQuery, pathSeparator} = options;
@@ -48,21 +55,29 @@ export function match(string, query, options) {
 //
 // Helper around match if you want a string with result wrapped by some delimiter text
 
+/**
+ *
+ * @param {string} string
+ * @param {string} query
+ * @param {WrapOptions} options
+ * @returns {*}
+ */
 export function wrap(string, query, options) {
 
     let tagClass = options.tagClass ||  'highlight';
     let tagOpen = options.tagOpen || `<strong class="${tagClass}">`;
     let tagClose = options.tagClose || '</strong>';
 
-    if (string === query) {
+    if (string === options.preparedQuery.query) {
         return tagOpen + string + tagClose;
     }
 
     //Run get position where a match is found
-    let matchPositions = match(string, query, options);
+    let matchPositions = match(string,query, options);
+    let nbMatches = matchPositions.length;
 
     //If no match return as is
-    if (matchPositions.length === 0) {
+    if (nbMatches === 0) {
         return string;
     }
 
@@ -70,7 +85,7 @@ export function wrap(string, query, options) {
     let output = '';
     let matchIndex = -1;
     let strPos = 0;
-    while (++matchIndex < matchPositions.length) {
+    while (++matchIndex < nbMatches) {
         let matchPos = matchPositions[matchIndex];
 
         // Get text before the current match position
@@ -80,7 +95,7 @@ export function wrap(string, query, options) {
         }
 
         // Get consecutive matches to wrap under a single tag
-        while (++matchIndex < matchPositions.length) {
+        while (++matchIndex < nbMatches) {
             if (matchPositions[matchIndex] === matchPos + 1) {
                 matchPos++;
             } else {

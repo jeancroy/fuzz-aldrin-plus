@@ -128,7 +128,7 @@ gulp.task('build-browser-dev', () => {
 // nuggets
 //
 
-gulp.task('nuget-if-win', function(done) {
+gulp.task('nuget-if-win', (done) => {
 
     if(process.platform === "win32"){
         runSequence('nuget-pack', done)
@@ -139,7 +139,7 @@ gulp.task('nuget-if-win', function(done) {
 });
 
 
-gulp.task('nuget-download', function(done) {
+gulp.task('nuget-download', (done) => {
 
     if(fs.existsSync(options.nugetpath)) {
         return done();
@@ -150,7 +150,7 @@ gulp.task('nuget-download', function(done) {
         .on('close', done);
 });
 
-gulp.task('nuget-pack', ['nuget-download'], function(){
+gulp.task('nuget-pack', ['nuget-download'], () => {
 
     return gulp.src(options.nuspec)
         .pipe(nuget.pack({ nuget: options.nugetpath, version: pkg.version }))

@@ -3,7 +3,7 @@
 const path = require('path');
 
 module.exports = (options) => {
-    const config = {
+    return {
         resolveLoader: {root: path.join(__dirname, 'node_modules')},
         resolve: {
             extensions: ['', '.js', '.jsx']
@@ -46,5 +46,4 @@ module.exports = (options) => {
         }
     };
 
-    return config;
 };
