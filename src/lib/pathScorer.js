@@ -13,6 +13,13 @@ export default{
 //  Manage the logic of testing if there's a match and calling the main scoring function
 //  Also manage scoring a path and optional character.
 
+/**
+ *
+ * @param {string} string
+ * @param {Query} preparedQuery
+ * @param {ScoringOptions} options
+ * @returns {number}
+ */
 export function score(string, preparedQuery, options) {
     let {allowErrors} = options;
     if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {

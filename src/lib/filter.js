@@ -1,7 +1,7 @@
 import scorer from "./scorer";
 import pathScorer from "./pathScorer";
 import utils from "./utils";
-import {FilterState, FilterStateInternal} from './filterState'
+import {FilterResult, FilterState} from '../definitions/filterState'
 
 
 export default {
@@ -18,7 +18,7 @@ export default {
  */
 
 export function filterSync(candidates, preparedQuery,  options) {
-    let state = new FilterStateInternal();
+    let state = new FilterState();
     return executeFilter(candidates, preparedQuery, state, options)
 }
 
@@ -28,17 +28,17 @@ export function filterSync(candidates, preparedQuery,  options) {
  * @param {Query} preparedQuery
  * @param {FilterOptions} options
  * @param {filterCallback} callback
- * @returns {FilterState}
+ * @returns {FilterResult}
  */
 
 
 export function filterAsync(candidates, preparedQuery,  callback, options) {
 
-    let internalState = new FilterStateInternal();
-    let publicState = new FilterState(internalState);
+    let internalState = new FilterState();
+    let filterResult = new FilterResult(internalState);
 
     let scheduled = () => {
-        callback( executeFilter(candidates, preparedQuery, internalState, options), publicState );
+        callback( executeFilter(candidates, preparedQuery, internalState, options), filterResult );
     };
 
     if(typeof setImmediate === "function"){
@@ -47,7 +47,7 @@ export function filterAsync(candidates, preparedQuery,  callback, options) {
         setTimeout(scheduled,0)
     }
 
-    return publicState;
+    return filterResult;
 
 }
 
@@ -55,14 +55,14 @@ export function filterAsync(candidates, preparedQuery,  callback, options) {
  *
  * @param {Array|Iterable} candidates
  * @param {Query} preparedQuery
- * @param {FilterStateInternal} state
+ * @param {FilterState} state
  * @param {FilterOptions} options
  * @returns {Array}
  */
 
 function executeFilter(candidates, preparedQuery, state, options) {
 
-    if(state.shouldAbort) return [];
+    if(state.cancelRequest) return [];
 
     // See option parsing on main module for default
     const {key, maxResults, outputScore, usePathScoring} = options;
@@ -76,7 +76,7 @@ function executeFilter(candidates, preparedQuery, state, options) {
     }
 
     // Init state
-    state.isActive = true;
+    state.isPending = true;
     state.accessor = accessor;
     state.scoreProvider = usePathScoring ? pathScorer : scorer;
     state.scoredCandidates = [];
@@ -89,7 +89,7 @@ function executeFilter(candidates, preparedQuery, state, options) {
 
     // Cleanup
     state.scoredCandidates = null;
-    state.isActive = false;
+    state.isPending = false;
 
     // Quick exit
     if(state.discardResults || scoredCandidates==null || !scoredCandidates.length ) return [];
@@ -164,14 +164,14 @@ function processCollection(collection, preparedQuery, state, options){
  *
  * @param {string|object} candidate
  * @param {Query} preparedQuery
- * @param {FilterStateInternal} context
+ * @param {FilterState} context
  * @param {FilterOptions} options
  * @returns {boolean}
  */
 
 function processItem(candidate, preparedQuery, context, options){
 
-    if(context.shouldAbort) return false;
+    if(context.cancelRequest) return false;
     context.count++;
 
     let {accessor, scoredCandidates, scoreProvider } = context;

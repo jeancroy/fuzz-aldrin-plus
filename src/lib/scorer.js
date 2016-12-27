@@ -45,6 +45,13 @@ export default{
 // Manage the logic of testing if there's a match and calling the main scoring function
 // Also manage scoring a path and optional character.
 
+/**
+ *
+ * @param {string} string
+ * @param {Query} preparedQuery
+ * @param {ScoringOptions} options
+ * @returns {number}
+ */
 export function score(string, preparedQuery, options) {
     let {allowErrors} = options;
     if (!allowErrors && !isMatch(string, preparedQuery.core_lw, preparedQuery.core_up)) {
@@ -103,10 +110,17 @@ export function isMatch(subject, query_lw, query_up) {
 // Main scoring algorithm
 //
 
+/**
+ *
+ * @param {string} subject
+ * @param {string} subject_lw
+ * @param {Query} preparedQuery
+ * @param {ScoringOptions} options
+ * @returns {*}
+ */
 export function computeScore(subject, subject_lw, preparedQuery, options) {
     let {query, query_lw} = preparedQuery;
-    let flexUppercase = true;
-
+    let flexUppercase = !options.strictUpperCase;
 
     let m = subject.length;
     let n = query.length;
@@ -154,7 +168,7 @@ export function computeScore(subject, subject_lw, preparedQuery, options) {
         csc_row[j] = 0;
     }
 
-    // Limit the search to the isActive region
+    // Limit the search to the isPending region
     // for example with query `abc`, subject `____a_bc_ac_c____`
     // there's a region before first `a` and after last `c`
     // that can be simplified out of the matching process

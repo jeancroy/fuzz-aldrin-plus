@@ -8,6 +8,11 @@ import {countDir, getExtension} from "./pathScorer";
 
 export class Query {
 
+    /**
+     *
+     * @param {string} query
+     * @param {QueryOptions} options
+     */
     constructor(query, options) {
 
         if (query == null || !query.length) {
@@ -32,6 +37,12 @@ export class Query {
 
 const opt_char_re = /[ _\-:\/\\]/g;
 
+/**
+ *
+ * @param {string} query
+ * @param {RegExp} optCharRegEx
+ * @returns {string}
+ */
 function coreChars(query, optCharRegEx) {
 
     if (optCharRegEx == null) {

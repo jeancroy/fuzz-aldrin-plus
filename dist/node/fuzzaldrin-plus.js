@@ -3,9 +3,6 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 exports.filter = filter;
 exports.filterAsync = filterAsync;
 exports.score = score;
@@ -23,16 +20,28 @@ var _matcher = require("./lib/matcher");
 
 var _query = require("./lib/query");
 
+var _defaultOptions = require("./definitions/defaultOptions");
+
+var _env = require("./lib/env");
+
+var defaultOptions = (0, _defaultOptions.getDefaults)(_env.env);
+
 var fuzzaldrin = {
     filter: filter,
     score: score,
     match: match,
     wrap: wrap,
-    prepareQuery: prepareQuery
+    prepareQuery: prepareQuery,
+    defaultOptions: defaultOptions
 };
 
 exports.default = fuzzaldrin;
 
+// Export main object to global window.
+
+if (_env.env.isBrowser) {
+    window.fuzzaldrin = fuzzaldrin;
+}
 
 var preparedQueryCache = null;
 
@@ -57,7 +66,7 @@ function filter(candidates, query, options) {
     if (!checkString(query)) return [];
     if (!checkCollection(candidates)) return [];
 
-    options = parseOptions(options);
+    options = parseOptions(options, defaultOptions.filterOptions);
     var preparedQuery = getPreparedQuery(query, options);
 
     return (0, _filter.filterSync)(candidates, preparedQuery, options);
@@ -69,7 +78,7 @@ function filter(candidates, query, options) {
  * @param query
  * @param options
  * @param {filterCallback} callback
- * @returns {FilterState}
+ * @returns {FilterResult}
  */
 
 function filterAsync(candidates, query, callback, options) {
@@ -77,7 +86,7 @@ function filterAsync(candidates, query, callback, options) {
     if (!checkString(query)) return [];
     if (!checkCollection(candidates)) return [];
 
-    options = parseOptions(options);
+    options = parseOptions(options, defaultOptions.filterOptions);
     var preparedQuery = getPreparedQuery(query, options);
 
     return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
@@ -103,7 +112,7 @@ function score(string, query, options) {
     if (!checkString(string)) return 0;
     if (!checkString(query)) return 0;
 
-    options = parseOptions(options);
+    options = parseOptions(options, defaultOptions.scoringOptions);
     var preparedQuery = getPreparedQuery(query, options);
 
     if (options.usePathScoring) {
@@ -140,7 +149,7 @@ function match(string, query, options) {
         return range;
     }
 
-    options = parseOptions(options);
+    options = parseOptions(options, defaultOptions.matchOptions);
     var preparedQuery = getPreparedQuery(query, options);
 
     return (0, _matcher.match)(string, preparedQuery, options);
@@ -173,7 +182,7 @@ function wrap(string, query, options) {
     if (!checkString(string)) return "";
     if (!checkString(query)) return string;
 
-    options = parseOptions(options);
+    options = parseOptions(options, defaultOptions.wrapOptions);
     var preparedQuery = getPreparedQuery(query, options);
 
     return (0, _matcher.wrap)(string, query, options);
@@ -214,65 +223,16 @@ function checkCollection(obj) {
 }
 
 //
-// Detect node.js or browser to set default path separator
-//
-
-var defaultPathSeparator = "/";
-
-if ((typeof process === "undefined" ? "undefined" : _typeof(process)) === 'object' && Object.prototype.toString.call(process) === '[object process]') {
-
-    // On node js we assume the list of candidates match local OS path format.
-    // See comment bellow to change behavior.
-    defaultPathSeparator = process.platform === "win32" ? '\\' : '/';
-} else if ((typeof window === "undefined" ? "undefined" : _typeof(window)) === 'object' && Object.prototype.toString.call(window) === "[object Window]") {
-
-    // We assume that browser are dealing with url, if assumption is false use option hash like so:
-    // fuzzaldrin.filter( candidates, query, {pathSeparator: platformSep} )
-    // and determine `platformSep` any so it match the format of candidates.
-
-    defaultPathSeparator = "/";
-
-    // Export main object to global window.
-    window.fuzzaldrin = fuzzaldrin;
-}
-
-//
 // Setup default values
 //
 
-/**
- * @type {ScoringOptions}
- */
-var defaultOptions = {
-    allowErrors: false,
-    usePathScoring: true,
-    useExtensionBonus: false,
-    pathSeparator: defaultPathSeparator,
-    optCharRegEx: null,
-    preparedQuery: null
-};
 
-/**
- *
- * @param {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options
- * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
- */
-
-function parseOptions(options) {
+function parseOptions(options, defaultOptions) {
 
     // If no options given, copy default
     // Else merge options with defaults.
-
     if (options == null) options = {};
-
-    var hasOwnProperty = Object.prototype.hasOwnProperty;
-    for (var key in defaultOptions) {
-        if (hasOwnProperty.call(defaultOptions, key) && !hasOwnProperty.call(options, key)) {
-            options[key] = defaultOptions[key];
-        }
-    }
-
-    return options;
+    return (0, _defaultOptions.extend)(defaultOptions, options);
 }
 
 function getPreparedQuery(query, options) {
@@ -290,72 +250,11 @@ function getPreparedQuery(query, options) {
 }
 
 //
-// Documentation for option hash
-//
-
-/**
- * @typedef {Object} QueryOptions
- * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
- * @property {RegExp} optCharRegEx - Regex that identify character that does not have to match exactly, for example <whitespace>.
- *
- */
-
-/**
- * @typedef {Object} ScoringOptions
- * @extends QueryOptions
- *
- * @property {boolean} allowErrors - Should we allow candidates that does not have all characters of query ?
- * @property {boolean} usePathScoring - Should we try to interpret candidates as path
- * @property {boolean} useExtensionBonus - Should we try to interpret extension from query
- *                                         and prefer files that match that extension (needs usePathScoring)
- * @property {Query} preparedQuery - If you have a precomputed query object set it here.
- */
-
-/**
- * @typedef {Object} FilterOptions
- * @extends ScoringOptions
- *
- * @property {string|function} key - Name of the property that contain string ot be scored
- *                                   or function that input candidate and output string to be scored.
- *
- * @property {number} maxResults - Output the top `maxResults` best results at most.
- * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
- *
- */
-
-/**
- * @typedef {Object} MatchOptions
- * @extends ScoringOptions
- *
- *
- */
-
-/**
- * @typedef {Object} WrapOptions
- * @extends MatchOptions
- *
- * @property {string} tagOpen - string to place before a match default to `<strong class="highlight">`
- * @property {string} tagClose - string to place after a match default to `</strong>`
- * @property {string} tagClass - change the class of the default open tag (tagOpen must be unset)
- *
- */
-
-//
 // Async
 //
 
 /**
  * @callback filterCallback
  * @param {Array} results
- * @param {FilterState} state
- */
-
-/**
- * @typedef {Object} FilterState
- *
- * @method  abort - stop scoring and return no results.
- * @method  isActive - is the filter running.
- * @method  isCanceled - has the filter been canceled.
- * @method  getProgressCount - get the count of processed elements.
- *
+ * @param {FilterResult} state
  */

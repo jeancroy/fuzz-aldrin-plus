@@ -54,9 +54,6 @@
 	"use strict";
 
 	exports.__esModule = true;
-
-	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 	exports.filter = filter;
 	exports.filterAsync = filterAsync;
 	exports.score = score;
@@ -74,16 +71,28 @@
 
 	var _query = __webpack_require__(8);
 
+	var _defaultOptions = __webpack_require__(9);
+
+	var _env = __webpack_require__(10);
+
+	var defaultOptions = (0, _defaultOptions.getDefaults)(_env.env);
+
 	var fuzzaldrin = {
 	    filter: filter,
 	    score: score,
 	    match: match,
 	    wrap: wrap,
-	    prepareQuery: prepareQuery
+	    prepareQuery: prepareQuery,
+	    defaultOptions: defaultOptions
 	};
 
 	exports.default = fuzzaldrin;
 
+	// Export main object to global window.
+
+	if (_env.env.isBrowser) {
+	    window.fuzzaldrin = fuzzaldrin;
+	}
 
 	var preparedQueryCache = null;
 
@@ -108,7 +117,7 @@
 	    if (!checkString(query)) return [];
 	    if (!checkCollection(candidates)) return [];
 
-	    options = parseOptions(options);
+	    options = parseOptions(options, defaultOptions.filterOptions);
 	    var preparedQuery = getPreparedQuery(query, options);
 
 	    return (0, _filter.filterSync)(candidates, preparedQuery, options);
@@ -120,7 +129,7 @@
 	 * @param query
 	 * @param options
 	 * @param {filterCallback} callback
-	 * @returns {FilterState}
+	 * @returns {FilterResult}
 	 */
 
 	function filterAsync(candidates, query, callback, options) {
@@ -128,7 +137,7 @@
 	    if (!checkString(query)) return [];
 	    if (!checkCollection(candidates)) return [];
 
-	    options = parseOptions(options);
+	    options = parseOptions(options, defaultOptions.filterOptions);
 	    var preparedQuery = getPreparedQuery(query, options);
 
 	    return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
@@ -154,7 +163,7 @@
 	    if (!checkString(string)) return 0;
 	    if (!checkString(query)) return 0;
 
-	    options = parseOptions(options);
+	    options = parseOptions(options, defaultOptions.scoringOptions);
 	    var preparedQuery = getPreparedQuery(query, options);
 
 	    if (options.usePathScoring) {
@@ -191,7 +200,7 @@
 	        return range;
 	    }
 
-	    options = parseOptions(options);
+	    options = parseOptions(options, defaultOptions.matchOptions);
 	    var preparedQuery = getPreparedQuery(query, options);
 
 	    return (0, _matcher.match)(string, preparedQuery, options);
@@ -224,7 +233,7 @@
 	    if (!checkString(string)) return "";
 	    if (!checkString(query)) return string;
 
-	    options = parseOptions(options);
+	    options = parseOptions(options, defaultOptions.wrapOptions);
 	    var preparedQuery = getPreparedQuery(query, options);
 
 	    return (0, _matcher.wrap)(string, query, options);
@@ -265,65 +274,16 @@
 	}
 
 	//
-	// Detect node.js or browser to set default path separator
-	//
-
-	var defaultPathSeparator = "/";
-
-	if ((typeof process === "undefined" ? "undefined" : _typeof(process)) === 'object' && Object.prototype.toString.call(process) === '[object process]') {
-
-	    // On node js we assume the list of candidates match local OS path format.
-	    // See comment bellow to change behavior.
-	    defaultPathSeparator = process.platform === "win32" ? '\\' : '/';
-	} else if ((typeof window === "undefined" ? "undefined" : _typeof(window)) === 'object' && Object.prototype.toString.call(window) === "[object Window]") {
-
-	    // We assume that browser are dealing with url, if assumption is false use option hash like so:
-	    // fuzzaldrin.filter( candidates, query, {pathSeparator: platformSep} )
-	    // and determine `platformSep` any so it match the format of candidates.
-
-	    defaultPathSeparator = "/";
-
-	    // Export main object to global window.
-	    window.fuzzaldrin = fuzzaldrin;
-	}
-
-	//
 	// Setup default values
 	//
 
-	/**
-	 * @type {ScoringOptions}
-	 */
-	var defaultOptions = {
-	    allowErrors: false,
-	    usePathScoring: true,
-	    useExtensionBonus: false,
-	    pathSeparator: defaultPathSeparator,
-	    optCharRegEx: null,
-	    preparedQuery: null
-	};
 
-	/**
-	 *
-	 * @param {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options
-	 * @returns {(ScoringOptions|FilterOptions|MatchOptions|WrapOptions)} options completed with default values from ScoringOptions
-	 */
-
-	function parseOptions(options) {
+	function parseOptions(options, defaultOptions) {
 
 	    // If no options given, copy default
 	    // Else merge options with defaults.
-
 	    if (options == null) options = {};
-
-	    var hasOwnProperty = Object.prototype.hasOwnProperty;
-	    for (var key in defaultOptions) {
-	        if (hasOwnProperty.call(defaultOptions, key) && !hasOwnProperty.call(options, key)) {
-	            options[key] = defaultOptions[key];
-	        }
-	    }
-
-	    return options;
+	    return (0, _defaultOptions.extend)(defaultOptions, options);
 	}
 
 	function getPreparedQuery(query, options) {
@@ -341,74 +301,13 @@
 	}
 
 	//
-	// Documentation for option hash
-	//
-
-	/**
-	 * @typedef {Object} QueryOptions
-	 * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
-	 * @property {RegExp} optCharRegEx - Regex that identify character that does not have to match exactly, for example <whitespace>.
-	 *
-	 */
-
-	/**
-	 * @typedef {Object} ScoringOptions
-	 * @extends QueryOptions
-	 *
-	 * @property {boolean} allowErrors - Should we allow candidates that does not have all characters of query ?
-	 * @property {boolean} usePathScoring - Should we try to interpret candidates as path
-	 * @property {boolean} useExtensionBonus - Should we try to interpret extension from query
-	 *                                         and prefer files that match that extension (needs usePathScoring)
-	 * @property {Query} preparedQuery - If you have a precomputed query object set it here.
-	 */
-
-	/**
-	 * @typedef {Object} FilterOptions
-	 * @extends ScoringOptions
-	 *
-	 * @property {string|function} key - Name of the property that contain string ot be scored
-	 *                                   or function that input candidate and output string to be scored.
-	 *
-	 * @property {number} maxResults - Output the top `maxResults` best results at most.
-	 * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
-	 *
-	 */
-
-	/**
-	 * @typedef {Object} MatchOptions
-	 * @extends ScoringOptions
-	 *
-	 *
-	 */
-
-	/**
-	 * @typedef {Object} WrapOptions
-	 * @extends MatchOptions
-	 *
-	 * @property {string} tagOpen - string to place before a match default to `<strong class="highlight">`
-	 * @property {string} tagClose - string to place after a match default to `</strong>`
-	 * @property {string} tagClass - change the class of the default open tag (tagOpen must be unset)
-	 *
-	 */
-
-	//
 	// Async
 	//
 
 	/**
 	 * @callback filterCallback
 	 * @param {Array} results
-	 * @param {FilterState} state
-	 */
-
-	/**
-	 * @typedef {Object} FilterState
-	 *
-	 * @method  abort - stop scoring and return no results.
-	 * @method  isActive - is the filter running.
-	 * @method  isCanceled - has the filter been canceled.
-	 * @method  getProgressCount - get the count of processed elements.
-	 *
+	 * @param {FilterResult} state
 	 */
 
 /***/ },
@@ -451,7 +350,7 @@
 	 */
 
 	function filterSync(candidates, preparedQuery, options) {
-	    var state = new _filterState.FilterStateInternal();
+	    var state = new _filterState.FilterState();
 	    return executeFilter(candidates, preparedQuery, state, options);
 	}
 
@@ -461,16 +360,16 @@
 	 * @param {Query} preparedQuery
 	 * @param {FilterOptions} options
 	 * @param {filterCallback} callback
-	 * @returns {FilterState}
+	 * @returns {FilterResult}
 	 */
 
 	function filterAsync(candidates, preparedQuery, callback, options) {
 
-	    var internalState = new _filterState.FilterStateInternal();
-	    var publicState = new _filterState.FilterState(internalState);
+	    var internalState = new _filterState.FilterState();
+	    var filterResult = new _filterState.FilterResult(internalState);
 
 	    var scheduled = function scheduled() {
-	        callback(executeFilter(candidates, preparedQuery, internalState, options), publicState);
+	        callback(executeFilter(candidates, preparedQuery, internalState, options), filterResult);
 	    };
 
 	    if (typeof setImmediate === "function") {
@@ -479,21 +378,21 @@
 	        setTimeout(scheduled, 0);
 	    }
 
-	    return publicState;
+	    return filterResult;
 	}
 
 	/**
 	 *
 	 * @param {Array|Iterable} candidates
 	 * @param {Query} preparedQuery
-	 * @param {FilterStateInternal} state
+	 * @param {FilterState} state
 	 * @param {FilterOptions} options
 	 * @returns {Array}
 	 */
 
 	function executeFilter(candidates, preparedQuery, state, options) {
 
-	    if (state.shouldAbort) return [];
+	    if (state.cancelRequest) return [];
 
 	    // See option parsing on main module for default
 	    var key = options.key,
@@ -513,7 +412,7 @@
 	    }
 
 	    // Init state
-	    state.isActive = true;
+	    state.isPending = true;
 	    state.accessor = accessor;
 	    state.scoreProvider = usePathScoring ? _pathScorer2.default : _scorer2.default;
 	    state.scoredCandidates = [];
@@ -526,7 +425,7 @@
 
 	    // Cleanup
 	    state.scoredCandidates = null;
-	    state.isActive = false;
+	    state.isPending = false;
 
 	    // Quick exit
 	    if (state.discardResults || scoredCandidates == null || !scoredCandidates.length) return [];
@@ -602,14 +501,14 @@
 	 *
 	 * @param {string|object} candidate
 	 * @param {Query} preparedQuery
-	 * @param {FilterStateInternal} context
+	 * @param {FilterState} context
 	 * @param {FilterOptions} options
 	 * @returns {boolean}
 	 */
 
 	function processItem(candidate, preparedQuery, context, options) {
 
-	    if (context.shouldAbort) return false;
+	    if (context.cancelRequest) return false;
 	    context.count++;
 
 	    var accessor = context.accessor,
@@ -704,6 +603,13 @@
 	// Manage the logic of testing if there's a match and calling the main scoring function
 	// Also manage scoring a path and optional character.
 
+	/**
+	 *
+	 * @param {string} string
+	 * @param {Query} preparedQuery
+	 * @param {ScoringOptions} options
+	 * @returns {number}
+	 */
 	function score(string, preparedQuery, options) {
 	    var allowErrors = options.allowErrors;
 
@@ -761,11 +667,19 @@
 	// Main scoring algorithm
 	//
 
+	/**
+	 *
+	 * @param {string} subject
+	 * @param {string} subject_lw
+	 * @param {Query} preparedQuery
+	 * @param {ScoringOptions} options
+	 * @returns {*}
+	 */
 	function computeScore(subject, subject_lw, preparedQuery, options) {
 	    var query = preparedQuery.query,
 	        query_lw = preparedQuery.query_lw;
 
-	    var flexUppercase = true;
+	    var flexUppercase = !options.strictUpperCase;
 
 	    var m = subject.length;
 	    var n = query.length;
@@ -812,7 +726,7 @@
 	        csc_row[j] = 0;
 	    }
 
-	    // Limit the search to the isActive region
+	    // Limit the search to the isPending region
 	    // for example with query `abc`, subject `____a_bc_ac_c____`
 	    // there's a region before first `a` and after last `c`
 	    // that can be simplified out of the matching process
@@ -1258,6 +1172,14 @@
 	//  Manage the logic of testing if there's a match and calling the main scoring function
 	//  Also manage scoring a path and optional character.
 
+	/**
+	 *
+	 * @param {string} string
+	 * @param {Query} preparedQuery
+	 * @param {ScoringOptions} options
+	 * @returns {number}
+	 */
+
 	function score(string, preparedQuery, options) {
 	    var allowErrors = options.allowErrors;
 
@@ -1504,47 +1426,60 @@
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-	var FilterStateInternal = exports.FilterStateInternal = function FilterStateInternal() {
-	    _classCallCheck(this, FilterStateInternal);
-
-	    this.isActive = false;
-	    this.shouldAbort = false;
-	    this.discardResults = false;
-	    this.count = 0;
-	    this.scoredCandidates = null;
-	    this.accessor = null;
-	    this.scoreProvider = null;
-	};
-
-	var FilterState =
-
-	/**
-	 * @param {FilterStateInternal} internalState
-	 */
-
-	exports.FilterState = function FilterState(internalState) {
+	var FilterState = exports.FilterState = function FilterState() {
 	    _classCallCheck(this, FilterState);
 
-	    // Closure over the internal state to make it read-only.
+	    // Filter result mechanic
+	    this.isPending = true;
+	    this.cancelRequest = false;
+	    this.discardResults = false;
+	    this.count = 0;
 
-	    this.abort = function abort() {
+	    // Specific to scoring
+	    this.scoredCandidates = null;
+	    this.scoreProvider = null;
+	    this.accessor = null;
+	};
+
+	/**
+	 * @typedef {Object} FilterResult
+	 *
+	 * @method  cancel - stop scoring and return no results.
+	 * @method  isCanceled - has the filter been canceled.
+	 * @method  isPending - filter is in progress or haven't started.
+	 * @method  getProgress - get the count of processed elements.
+	 *
+	 */
+
+	var FilterResult =
+
+	/**
+	 * @param {FilterState} state
+	 */
+
+	exports.FilterResult = function FilterResult(state) {
+	    _classCallCheck(this, FilterResult);
+
+	    // Closure over the internal state to avoid manual changes.
+
+	    this.cancel = function cancel() {
 	        var keepResults = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
 
-	        internalState.isActive = false;
-	        internalState.shouldAbort = true;
-	        internalState.discardResults = !keepResults;
-	    };
-
-	    this.isActive = function isActive() {
-	        return internalState.isActive;
+	        state.isPending = false;
+	        state.cancelRequest = true;
+	        state.discardResults = !keepResults;
 	    };
 
 	    this.isCanceled = function isCanceled() {
-	        return internalState.shouldAbort;
+	        return state.cancelRequest;
 	    };
 
-	    this.getProgressCount = function getProgressCount() {
-	        return internalState.count;
+	    this.isPending = function isPending() {
+	        return state.isPending;
+	    };
+
+	    this.getProgress = function getProgress() {
+	        return state.count;
 	    };
 	};
 
@@ -1552,7 +1487,7 @@
 /* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';
+	"use strict";
 
 	exports.__esModule = true;
 	exports.match = match;
@@ -1622,10 +1557,14 @@
 	 * @returns {*}
 	 */
 	function wrap(string, preparedQuery, options) {
+	    var tagClass = options.tagClass,
+	        tagOpen = options.tagOpen,
+	        tagClose = options.tagClose;
 
-	    var tagClass = options.tagClass || 'highlight';
-	    var tagOpen = options.tagOpen || '<strong class="' + tagClass + '">';
-	    var tagClose = options.tagClose || '</strong>';
+
+	    if (tagOpen && tagOpen.length) {
+	        tagOpen = tagOpen.replace("{tagClass}", tagClass);
+	    }
 
 	    if (string === preparedQuery.query) {
 	        return tagOpen + string + tagClose;
@@ -1925,7 +1864,14 @@
 	//
 
 
-	var Query = exports.Query = function Query(query, options) {
+	var Query =
+
+	/**
+	 *
+	 * @param {string} query
+	 * @param {QueryOptions} options
+	 */
+	exports.Query = function Query(query, options) {
 	    _classCallCheck(this, Query);
 
 	    if (query == null || !query.length) {
@@ -1948,6 +1894,12 @@
 
 	var opt_char_re = /[ _\-:\/\\]/g;
 
+	/**
+	 *
+	 * @param {string} query
+	 * @param {RegExp} optCharRegEx
+	 * @returns {string}
+	 */
 	function coreChars(query, optCharRegEx) {
 
 	    if (optCharRegEx == null) {
@@ -2011,6 +1963,173 @@
 
 	    return charCodes;
 	}
+
+/***/ },
+/* 9 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	exports.__esModule = true;
+	exports.getDefaults = getDefaults;
+	exports.extend = extend;
+	/**
+	 *
+	 * @param env
+	 * @returns {{queryOptions: QueryOptions, scoringOptions: ScoringOptions, filterOptions: FilterOptions, matchOptions: MatchOptions, wrapOptions: WrapOptions}}
+	 */
+
+	function getDefaults(env) {
+
+	    var defaultPathSeparator = env.defaultPathSeparator;
+
+	    /**
+	     * @typedef {Object} QueryOptions
+	     * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
+	     * @property {RegExp} optCharRegEx - Regex that identify character that does not have to match exactly, for example <whitespace>.
+	     *
+	     */
+
+	    /**
+	     * @type {QueryOptions}
+	     */
+	    var queryOptions = {
+	        pathSeparator: defaultPathSeparator,
+	        optCharRegEx: null
+	    };
+
+	    /**
+	     * @typedef {Object} ScoringOptions
+	     * @extends QueryOptions
+	     *
+	     * @property {boolean} strictUpperCase - With this on, uppercase must be matched by another uppercase.
+	     *                                       With this off, same case is preferred but not mandatory.
+	     * @property {boolean} allowErrors - Should we allow candidates that does not have all characters of query ?
+	     * @property {boolean} usePathScoring - Should we try to interpret candidates as path
+	     * @property {boolean} useExtensionBonus - Should we try to interpret extension from query
+	     *                                         and prefer files that match that extension (needs usePathScoring)
+	     * @property {Query} preparedQuery - If you have a precomputed query object set it here.
+	     */
+
+	    /**
+	     * @type {ScoringOptions}
+	     */
+	    var scoringOptions = extend(queryOptions, {
+	        strictUpperCase: false,
+	        allowErrors: false,
+	        usePathScoring: true,
+	        useExtensionBonus: false,
+	        preparedQuery: null
+	    });
+
+	    /**
+	     * @typedef {Object} FilterOptions
+	     * @extends ScoringOptions
+	     *
+	     * @property {string|function|null} key - Name of the property that contain string ot be scored
+	     *                                   or function that input candidate and output string to be scored.
+	     *
+	     * @property {number|null} maxResults - Output the top `maxResults` best results at most.
+	     * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
+	     *
+	     */
+
+	    /**
+	     * @type {FilterOptions}
+	     */
+	    var filterOptions = extend(scoringOptions, {
+	        key: null,
+	        maxResults: null,
+	        outputScore: false
+	    });
+
+	    /**
+	     * @typedef {Object} MatchOptions
+	     * @extends ScoringOptions
+	     *
+	     */
+
+	    /**
+	     * @type {MatchOptions}
+	     */
+	    var matchOptions = extend(scoringOptions, {});
+
+	    /**
+	     * @typedef {Object} WrapOptions
+	     * @extends MatchOptions
+	     *
+	     * @property {string} tagOpen - string to place before a match default to `<strong class="highlight">`
+	     * @property {string} tagClose - string to place after a match default to `</strong>`
+	     * @property {string} tagClass - change the class of the default open tag (tagOpen must be unset)
+	     *
+	     */
+
+	    /**
+	     * @type {WrapOptions}
+	     */
+	    var wrapOptions = extend(matchOptions, {
+	        tagOpen: '<strong class="{tagClass}">',
+	        tagClose: '</strong>',
+	        tagClass: 'highlight'
+	    });
+
+	    return {
+	        queryOptions: queryOptions,
+	        scoringOptions: scoringOptions,
+	        filterOptions: filterOptions,
+	        matchOptions: matchOptions,
+	        wrapOptions: wrapOptions
+	    };
+	}
+
+	function extend(reference, target) {
+
+	    var hasOwnProperty = Object.prototype.hasOwnProperty;
+	    for (var key in reference) {
+	        if (hasOwnProperty.call(reference, key) && !hasOwnProperty.call(target, key)) {
+	            target[key] = reference[key];
+	        }
+	    }
+
+	    return target;
+	}
+
+	exports.default = {
+	    getDefaults: getDefaults,
+	    extend: extend
+	};
+
+/***/ },
+/* 10 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+	//
+	// Detect node.js or browser to set default path separator
+	//
+
+	var isNode = (typeof process === 'undefined' ? 'undefined' : _typeof(process)) === 'object' && Object.prototype.toString.call(process) === '[object process]';
+	var isBrowser = !isNode && (typeof window === 'undefined' ? 'undefined' : _typeof(window)) === 'object' && Object.prototype.toString.call(window) === "[object Window]";
+
+	// On node js we assume the list of candidates match local OS path format.
+	// While on browser assume that we are dealing with url
+	// Use 'options.pathSeparator' if you need a behavior different from those assumptions.
+	var defaultPathSeparator = isNode && process.platform === "win32" ? "\\" : "/";
+
+	var env = exports.env = {
+	    isNode: isNode,
+	    isBrowser: isBrowser,
+	    defaultPathSeparator: defaultPathSeparator
+	};
+
+	exports.default = {
+	    env: env
+	};
 
 /***/ }
 /******/ ]);

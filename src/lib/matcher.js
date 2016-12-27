@@ -64,9 +64,11 @@ export function match(string, preparedQuery, options) {
  */
 export function wrap(string, preparedQuery, options) {
 
-    let tagClass = options.tagClass ||  'highlight';
-    let tagOpen = options.tagOpen || `<strong class="${tagClass}">`;
-    let tagClose = options.tagClose || '</strong>';
+    let {tagClass, tagOpen, tagClose} = options;
+
+    if(tagOpen && tagOpen.length){
+        tagOpen = tagOpen.replace("{tagClass}", tagClass);
+    }
 
     if (string === preparedQuery.query) {
         return tagOpen + string + tagClose;
