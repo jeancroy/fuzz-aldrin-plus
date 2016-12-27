@@ -1,7 +1,7 @@
-import {filterSync as processFilterSync, filterAsync as processFilterAsync} from "./lib/filter";
-import {score as processScore} from "./lib/scorer";
-import {score as processPathScore} from "./lib/pathScorer";
-import {match as processMatch, wrap as processWrap} from "./lib/matcher";
+import {filterSync as doFilterSync, filterAsync as doFilterAsync} from "./lib/filter";
+import {score as doScore} from "./lib/scorer";
+import {score as doPathScore} from "./lib/pathScorer";
+import {match as doMatch, wrap as doWrap} from "./lib/matcher";
 import {Query} from "./lib/query";
 import {getDefaults, extend} from "./definitions/defaultOptions"
 import {env} from "./lib/env"
@@ -51,7 +51,7 @@ export function filter(candidates, query, options) {
     options = parseOptions(options, defaultOptions.filterOptions);
     let preparedQuery = getPreparedQuery(query, options);
 
-    return processFilterSync(candidates, preparedQuery, options);
+    return doFilterSync(candidates, preparedQuery, options);
 
 }
 
@@ -72,7 +72,7 @@ export function filterAsync(candidates, query, callback, options) {
     options = parseOptions(options, defaultOptions.filterOptions);
     let preparedQuery = getPreparedQuery(query, options);
 
-    return processFilterAsync(candidates, preparedQuery, callback, options);
+    return doFilterAsync(candidates, preparedQuery, callback, options);
 
 }
 
@@ -107,9 +107,9 @@ export function score(string, query, options) {
     let preparedQuery = getPreparedQuery(query, options);
 
     if (options.usePathScoring) {
-        return processPathScore(string, preparedQuery, options);
+        return doPathScore(string, preparedQuery, options);
     } else {
-        return processScore(string, preparedQuery, options);
+        return doScore(string, preparedQuery, options);
     }
 
 }
@@ -144,7 +144,7 @@ export function match(string, query, options) {
     options = parseOptions(options, defaultOptions.matchOptions);
     let preparedQuery = getPreparedQuery(query, options);
 
-    return processMatch(string, preparedQuery, options);
+    return doMatch(string, preparedQuery, options);
 }
 
 
@@ -178,7 +178,7 @@ export function wrap(string, query, options) {
     options = parseOptions(options, defaultOptions.wrapOptions);
     let preparedQuery = getPreparedQuery(query, options);
 
-    return processWrap(string, query, options);
+    return doWrap(string, query, options);
 
 }
 
@@ -204,6 +204,11 @@ export function prepareQuery(query, options) {
     return getPreparedQuery(query, options);
 }
 
+
+//
+// Input checking
+//
+
 function checkString(str){
     //Not null, must have length property > 0
     return str != null && str.length != null && str.length > 0;
@@ -215,16 +220,6 @@ function checkCollection(obj){
     // Example of thing with size: (es6 sets, ImmutableJs collections)
     return obj != null && obj.length !== 0 && obj.size !== 0
 }
-
-
-
-
-//
-// Setup default values
-//
-
-
-
 
 function parseOptions(options, defaultOptions) {
 
