@@ -67,13 +67,13 @@
 
 	var _pathScorer = __webpack_require__(4);
 
-	var _matcher = __webpack_require__(7);
+	var _matcher = __webpack_require__(8);
 
-	var _query = __webpack_require__(8);
+	var _query = __webpack_require__(9);
 
-	var _defaultOptions = __webpack_require__(9);
+	var _defaultOptions = __webpack_require__(10);
 
-	var _env = __webpack_require__(10);
+	var _env = __webpack_require__(7);
 
 	var defaultOptions = (0, _defaultOptions.getDefaults)(_env.env);
 
@@ -91,7 +91,7 @@
 	// Export main object to global window.
 
 	if (_env.env.isBrowser) {
-	    window.fuzzaldrin = fuzzaldrin;
+	    _env.env.global.fuzzaldrin = fuzzaldrin;
 	}
 
 	var preparedQueryCache = null;
@@ -142,6 +142,12 @@
 
 	    return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
 	}
+
+	/**
+	 * @callback filterCallback
+	 * @param {Array} results
+	 * @param {FilterResult} state
+	 */
 
 	/**
 	 * Score:
@@ -261,6 +267,10 @@
 	    return getPreparedQuery(query, options);
 	}
 
+	//
+	// Input checking
+	//
+
 	function checkString(str) {
 	    //Not null, must have length property > 0
 	    return str != null && str.length != null && str.length > 0;
@@ -273,17 +283,11 @@
 	    return obj != null && obj.length !== 0 && obj.size !== 0;
 	}
 
-	//
-	// Setup default values
-	//
-
-
 	function parseOptions(options, defaultOptions) {
 
 	    // If no options given, copy default
 	    // Else merge options with defaults.
-	    if (options == null) options = {};
-	    return (0, _defaultOptions.extend)(defaultOptions, options);
+	    return (0, _defaultOptions.extend)(defaultOptions, options || {});
 	}
 
 	function getPreparedQuery(query, options) {
@@ -299,16 +303,6 @@
 	    // Serve from cache
 	    return preparedQueryCache;
 	}
-
-	//
-	// Async
-	//
-
-	/**
-	 * @callback filterCallback
-	 * @param {Array} results
-	 * @param {FilterResult} state
-	 */
 
 /***/ },
 /* 2 */
@@ -330,9 +324,9 @@
 
 	var _utils = __webpack_require__(5);
 
-	var _utils2 = _interopRequireDefault(_utils);
-
 	var _filterState = __webpack_require__(6);
+
+	var _env = __webpack_require__(7);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -350,8 +344,8 @@
 	 */
 
 	function filterSync(candidates, preparedQuery, options) {
-	    var state = new _filterState.FilterState();
-	    return executeFilter(candidates, preparedQuery, state, options);
+	    var filterState = new _filterState.FilterState();
+	    return executeFilter(candidates, preparedQuery, filterState, options);
 	}
 
 	/**
@@ -365,17 +359,20 @@
 
 	function filterAsync(candidates, preparedQuery, callback, options) {
 
-	    var internalState = new _filterState.FilterState();
-	    var filterResult = new _filterState.FilterResult(internalState);
+	    var filterState = new _filterState.FilterState();
+	    var filterResult = new _filterState.FilterResult(filterState);
+	    var PromiseCtor = options.promiseImplementation;
 
-	    var scheduled = function scheduled() {
-	        callback(executeFilter(candidates, preparedQuery, internalState, options), filterResult);
-	    };
-
-	    if (typeof setImmediate === "function") {
-	        setImmediate(scheduled);
+	    if ((0, _utils.isFunction)(PromiseCtor)) {
+	        filterState.promise = new PromiseCtor(function (resolve, reject) {
+	            var matches = executeFilter(candidates, preparedQuery, filterState, options);
+	            dispatchResult(matches, filterResult, callback, resolve, reject);
+	        });
 	    } else {
-	        setTimeout(scheduled, 0);
+	        defer(function () {
+	            var matches = executeFilter(candidates, preparedQuery, filterState, options);
+	            dispatchResult(matches, filterResult, callback, null, null);
+	        });
 	    }
 
 	    return filterResult;
@@ -406,7 +403,7 @@
 
 	    var accessor = null;
 	    if (key != null) {
-	        accessor = _utils2.default.isFunction(options.key) ? options.key : function (x) {
+	        accessor = (0, _utils.isFunction)(options.key) ? options.key : function (x) {
 	            return x[key];
 	        };
 	    }
@@ -453,7 +450,7 @@
 	    // Collection is an array
 	    //
 
-	    if (_utils2.default.isArray(collection)) {
+	    if ((0, _utils.isArray)(collection)) {
 	        for (var i = 0; i <= collection.length; i++) {
 	            if (!processItem(collection[i], preparedQuery, state, options)) break;
 	        }
@@ -464,10 +461,10 @@
 	    // Collection is an Iterable or Iterator (es6 protocol)
 	    //
 
-	    var iterator = _utils2.default.getIterator(collection);
+	    var iterator = (0, _utils.getIterator)(collection);
 	    if (iterator != null) {
 	        var item = iterator.next();
-	        if (_utils2.default.isIteratorItem(item)) {
+	        if ((0, _utils.isIteratorItem)(item)) {
 	            while (!item.done) {
 	                if (!processItem(item.value, preparedQuery, state, options)) break;
 	                item = iterator.next();
@@ -487,7 +484,7 @@
 	    //      so we continue iteration but short circuit most of the work.
 
 	    var cont = true;
-	    if (_utils2.default.isFunction(collection.forEach)) {
+	    if ((0, _utils.isFunction)(collection.forEach)) {
 	        collection.forEach(function (item) {
 	            return cont = cont && processItem(item, preparedQuery, state, options);
 	        });
@@ -533,6 +530,27 @@
 
 	function sortCandidates(a, b) {
 	    return b.score - a.score;
+	}
+
+	var defer = (0, _utils.isFunction)(_env.env.global.setImmediate) ? _env.env.global.setImmediate : function (sheduled) {
+	    return setTimeout(scheduled, 0);
+	};
+
+	function dispatchResult(matches, filterResult, callback, promiseResolve, promiseReject) {
+
+	    if ((0, _utils.isFunction)(callback)) {
+	        callback.call(null, matches, filterResult);
+	    }
+
+	    if (filterResult.isCanceled()) {
+	        if ((0, _utils.isFunction)(promiseReject)) {
+	            promiseReject.call(null, matches);
+	        }
+	    } else {
+	        if ((0, _utils.isFunction)(promiseResolve)) {
+	            promiseResolve.call(null, matches);
+	        }
+	    }
 	}
 
 /***/ },
@@ -1367,7 +1385,7 @@
 	    isIteratorItem: isIteratorItem
 	};
 	function isFunction(fn) {
-	    return typeof fn === "function";
+	    return !!fn && Object.prototype.toString.call(fn) === '[object Function]';
 	}
 
 	function isArray(tentativeArray) {
@@ -1433,6 +1451,7 @@
 	    this.isPending = true;
 	    this.cancelRequest = false;
 	    this.discardResults = false;
+	    this.promise = null;
 	    this.count = 0;
 
 	    // Specific to scoring
@@ -1444,7 +1463,12 @@
 	/**
 	 * @typedef {Object} FilterResult
 	 *
-	 * @method  cancel - stop scoring and return no results.
+	 * @method  then - promise / thenable interface.
+	 *                 A valid promise implementation must be available or this method will throw.
+	 *                 This will first try to use options.promiseImplementation then fallback to global Promise object if available.
+	 *                 The result of then() is a vanilla promise as defined by implementation and will not be a FilterResult
+	 *
+	 * @method  cancel - stop scoring and return empty results.
 	 * @method  isCanceled - has the filter been canceled.
 	 * @method  isPending - filter is in progress or haven't started.
 	 * @method  getProgress - get the count of processed elements.
@@ -1461,6 +1485,13 @@
 	    _classCallCheck(this, FilterResult);
 
 	    // Closure over the internal state to avoid manual changes.
+
+	    this.then = function then(onResolve, onReject) {
+	        if (state.promise == null) {
+	            throw new Error("No promise implementation available.");
+	        }
+	        return state.promise.then(onResolve, onReject);
+	    };
 
 	    this.cancel = function cancel() {
 	        var keepResults = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
@@ -1485,6 +1516,45 @@
 
 /***/ },
 /* 7 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	exports.__esModule = true;
+	//
+	// Detect node.js or browser to set default path separator
+	//
+
+
+	var objectToString = Object.prototype.toString;
+
+	var hasGlobal = typeof global !== 'undefined' && objectToString.call(global) === '[object global]';
+	var hasProcess = typeof process !== 'undefined' && objectToString.call(process) === '[object process]';
+	var hasWindow = typeof window !== 'undefined' && objectToString.call(window) === '[object Window]';
+
+	var isNode = hasGlobal && hasProcess;
+	var isBrowser = !isNode && hasWindow;
+
+	// On node js we assume the list of candidates match local OS path format.
+	// While on browser assume that we are dealing with url
+	// Use 'options.pathSeparator' if you need a behavior different from those assumptions.
+	var defaultPathSeparator = isNode && process.platform === "win32" ? "\\" : "/";
+
+	var root = isBrowser ? window : isNode ? global : {};
+
+	var env = exports.env = {
+	    isNode: isNode,
+	    isBrowser: isBrowser,
+	    defaultPathSeparator: defaultPathSeparator,
+	    global: root
+	};
+
+	exports.default = {
+	    env: env
+	};
+
+/***/ },
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -1846,7 +1916,7 @@
 	}
 
 /***/ },
-/* 8 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -1965,7 +2035,7 @@
 	}
 
 /***/ },
-/* 9 */
+/* 10 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -1981,8 +2051,6 @@
 
 	function getDefaults(env) {
 
-	    var defaultPathSeparator = env.defaultPathSeparator;
-
 	    /**
 	     * @typedef {Object} QueryOptions
 	     * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
@@ -1994,7 +2062,7 @@
 	     * @type {QueryOptions}
 	     */
 	    var queryOptions = {
-	        pathSeparator: defaultPathSeparator,
+	        pathSeparator: env.defaultPathSeparator,
 	        optCharRegEx: null
 	    };
 
@@ -2032,6 +2100,8 @@
 	     * @property {number|null} maxResults - Output the top `maxResults` best results at most.
 	     * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
 	     *
+	     * @property {function} promiseImplementation - global `Promise` object or compatible implementation.
+	     *
 	     */
 
 	    /**
@@ -2040,7 +2110,8 @@
 	    var filterOptions = extend(scoringOptions, {
 	        key: null,
 	        maxResults: null,
-	        outputScore: false
+	        outputScore: false,
+	        promiseImplementation: env.global.Promise || null
 	    });
 
 	    /**
@@ -2097,38 +2168,6 @@
 	exports.default = {
 	    getDefaults: getDefaults,
 	    extend: extend
-	};
-
-/***/ },
-/* 10 */
-/***/ function(module, exports) {
-
-	'use strict';
-
-	exports.__esModule = true;
-
-	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-	//
-	// Detect node.js or browser to set default path separator
-	//
-
-	var isNode = (typeof process === 'undefined' ? 'undefined' : _typeof(process)) === 'object' && Object.prototype.toString.call(process) === '[object process]';
-	var isBrowser = !isNode && (typeof window === 'undefined' ? 'undefined' : _typeof(window)) === 'object' && Object.prototype.toString.call(window) === "[object Window]";
-
-	// On node js we assume the list of candidates match local OS path format.
-	// While on browser assume that we are dealing with url
-	// Use 'options.pathSeparator' if you need a behavior different from those assumptions.
-	var defaultPathSeparator = isNode && process.platform === "win32" ? "\\" : "/";
-
-	var env = exports.env = {
-	    isNode: isNode,
-	    isBrowser: isBrowser,
-	    defaultPathSeparator: defaultPathSeparator
-	};
-
-	exports.default = {
-	    env: env
 	};
 
 /***/ }

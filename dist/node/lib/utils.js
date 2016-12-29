@@ -1,1 +1,67 @@
-"use strict";function isFunction(t){return"function"==typeof t}function isArray(t){return isFunction(Array.isArray)?Array.isArray(t):"[object Array]"===Object.prototype.toString.call(t)}function getIterator(t){if(null==t)return null;var r=null;return null!=REAL_ITERATOR_SYMBOL&&isFunction(t[REAL_ITERATOR_SYMBOL])?r=t[REAL_ITERATOR_SYMBOL]():isFunction(t[REAL_ITERATOR_SYMBOL])&&(r=t[FAUX_ITERATOR_SYMBOL]()),null!=r&&isFunction(r.next)?r:isFunction(t.next)?t:null}function isIteratorItem(t){return null!=t&&"done"in t&&"value"in t}Object.defineProperty(exports,"__esModule",{value:!0});var _typeof="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(t){return typeof t}:function(t){return t&&"function"==typeof Symbol&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t};exports.isFunction=isFunction,exports.isArray=isArray,exports.getIterator=getIterator,exports.isIteratorItem=isIteratorItem,exports.default={isFunction:isFunction,isArray:isArray,getIterator:getIterator,isIteratorItem:isIteratorItem};var REAL_ITERATOR_SYMBOL="function"==typeof Symbol&&"symbol"===_typeof(Symbol.iterator)?Symbol.iterator:null,FAUX_ITERATOR_SYMBOL="@@iterator";
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+exports.isFunction = isFunction;
+exports.isArray = isArray;
+exports.getIterator = getIterator;
+exports.isIteratorItem = isIteratorItem;
+exports.default = {
+    isFunction: isFunction,
+    isArray: isArray,
+    getIterator: getIterator,
+    isIteratorItem: isIteratorItem
+};
+function isFunction(fn) {
+    return !!fn && Object.prototype.toString.call(fn) === '[object Function]';
+}
+
+function isArray(tentativeArray) {
+
+    if (isFunction(Array.isArray)) {
+        return Array.isArray(tentativeArray);
+    }
+
+    return Object.prototype.toString.call(tentativeArray) === "[object Array]";
+}
+
+//
+// Es6 compatible iterator.
+// Follow convention of ImmutableJS
+//
+
+var REAL_ITERATOR_SYMBOL = typeof Symbol === "function" && _typeof(Symbol.iterator) === "symbol" ? Symbol.iterator : null;
+var FAUX_ITERATOR_SYMBOL = '@@iterator';
+
+function getIterator(object) {
+
+    if (object == null) return null;
+
+    // Get iterator from Iterable
+    var iterator = null;
+    if (REAL_ITERATOR_SYMBOL != null && isFunction(object[REAL_ITERATOR_SYMBOL])) {
+        // real es6 Iterable
+        iterator = object[REAL_ITERATOR_SYMBOL]();
+    } else if (isFunction(object[REAL_ITERATOR_SYMBOL])) {
+        // es < 6 fallback.
+        iterator = object[FAUX_ITERATOR_SYMBOL]();
+    }
+
+    // Ensure that that iterator implements 'next' function
+    if (iterator != null && isFunction(iterator.next)) return iterator;
+
+    // Test if object itself is iterator-like
+    if (isFunction(object.next)) {
+        return object;
+    }
+
+    return null;
+}
+
+function isIteratorItem(item) {
+    return item != null && 'done' in item && 'value' in item;
+}

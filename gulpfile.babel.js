@@ -99,7 +99,7 @@ gulp.task('build-node', () => {
             presets: ['es2015']
         }))
         // preserve jsdoc by not uglify main document
-        .pipe(gulpif(/^lib/, uglify()))
+        //.pipe(gulpif(/^lib/, uglify()))
         .pipe(gulp.dest(options.outputDir + "node/"));
 
 });

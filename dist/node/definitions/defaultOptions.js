@@ -13,8 +13,6 @@ exports.extend = extend;
 
 function getDefaults(env) {
 
-    var defaultPathSeparator = env.defaultPathSeparator;
-
     /**
      * @typedef {Object} QueryOptions
      * @property {string} pathSeparator - If candidate are path, indicate path separator used (usually '/' or '\\').
@@ -26,7 +24,7 @@ function getDefaults(env) {
      * @type {QueryOptions}
      */
     var queryOptions = {
-        pathSeparator: defaultPathSeparator,
+        pathSeparator: env.defaultPathSeparator,
         optCharRegEx: null
     };
 
@@ -64,6 +62,8 @@ function getDefaults(env) {
      * @property {number|null} maxResults - Output the top `maxResults` best results at most.
      * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
      *
+     * @property {function} promiseImplementation - global `Promise` object or compatible implementation.
+     *
      */
 
     /**
@@ -72,7 +72,8 @@ function getDefaults(env) {
     var filterOptions = extend(scoringOptions, {
         key: null,
         maxResults: null,
-        outputScore: false
+        outputScore: false,
+        promiseImplementation: env.global.Promise || null
     });
 
     /**

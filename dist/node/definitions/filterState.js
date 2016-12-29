@@ -13,6 +13,7 @@ var FilterState = exports.FilterState = function FilterState() {
     this.isPending = true;
     this.cancelRequest = false;
     this.discardResults = false;
+    this.promise = null;
     this.count = 0;
 
     // Specific to scoring
@@ -24,7 +25,12 @@ var FilterState = exports.FilterState = function FilterState() {
 /**
  * @typedef {Object} FilterResult
  *
- * @method  cancel - stop scoring and return no results.
+ * @method  then - promise / thenable interface.
+ *                 A valid promise implementation must be available or this method will throw.
+ *                 This will first try to use options.promiseImplementation then fallback to global Promise object if available.
+ *                 The result of then() is a vanilla promise as defined by implementation and will not be a FilterResult
+ *
+ * @method  cancel - stop scoring and return empty results.
  * @method  isCanceled - has the filter been canceled.
  * @method  isPending - filter is in progress or haven't started.
  * @method  getProgress - get the count of processed elements.
@@ -41,6 +47,13 @@ exports.FilterResult = function FilterResult(state) {
     _classCallCheck(this, FilterResult);
 
     // Closure over the internal state to avoid manual changes.
+
+    this.then = function then(onResolve, onReject) {
+        if (state.promise == null) {
+            throw new Error("No promise implementation available.");
+        }
+        return state.promise.then(onResolve, onReject);
+    };
 
     this.cancel = function cancel() {
         var keepResults = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;

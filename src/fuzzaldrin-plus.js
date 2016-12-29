@@ -21,7 +21,7 @@ export default fuzzaldrin
 
 // Export main object to global window.
 if(env.isBrowser){
-    window.fuzzaldrin = fuzzaldrin;
+    env.global.fuzzaldrin = fuzzaldrin;
 }
 
 let preparedQueryCache = null;
@@ -225,8 +225,7 @@ function parseOptions(options, defaultOptions) {
 
     // If no options given, copy default
     // Else merge options with defaults.
-    if(options == null) options = {};
-    return extend(defaultOptions, options);
+    return extend(defaultOptions, options || {} );
 
 }
 

@@ -40,7 +40,7 @@ exports.default = fuzzaldrin;
 // Export main object to global window.
 
 if (_env.env.isBrowser) {
-    window.fuzzaldrin = fuzzaldrin;
+    _env.env.global.fuzzaldrin = fuzzaldrin;
 }
 
 var preparedQueryCache = null;
@@ -91,6 +91,12 @@ function filterAsync(candidates, query, callback, options) {
 
     return (0, _filter.filterAsync)(candidates, preparedQuery, callback, options);
 }
+
+/**
+ * @callback filterCallback
+ * @param {Array} results
+ * @param {FilterResult} state
+ */
 
 /**
  * Score:
@@ -210,6 +216,10 @@ function prepareQuery(query, options) {
     return getPreparedQuery(query, options);
 }
 
+//
+// Input checking
+//
+
 function checkString(str) {
     //Not null, must have length property > 0
     return str != null && str.length != null && str.length > 0;
@@ -222,17 +232,11 @@ function checkCollection(obj) {
     return obj != null && obj.length !== 0 && obj.size !== 0;
 }
 
-//
-// Setup default values
-//
-
-
 function parseOptions(options, defaultOptions) {
 
     // If no options given, copy default
     // Else merge options with defaults.
-    if (options == null) options = {};
-    return (0, _defaultOptions.extend)(defaultOptions, options);
+    return (0, _defaultOptions.extend)(defaultOptions, options || {});
 }
 
 function getPreparedQuery(query, options) {
@@ -248,13 +252,3 @@ function getPreparedQuery(query, options) {
     // Serve from cache
     return preparedQueryCache;
 }
-
-//
-// Async
-//
-
-/**
- * @callback filterCallback
- * @param {Array} results
- * @param {FilterResult} state
- */

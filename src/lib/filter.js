@@ -1,7 +1,9 @@
 import scorer from "./scorer";
 import pathScorer from "./pathScorer";
-import utils from "./utils";
+import {isFunction, isArray, getIterator, isIteratorItem} from "./utils";
 import {FilterResult, FilterState} from '../definitions/filterState'
+import {env} from "./env"
+
 
 
 export default {
@@ -18,8 +20,8 @@ export default {
  */
 
 export function filterSync(candidates, preparedQuery,  options) {
-    let state = new FilterState();
-    return executeFilter(candidates, preparedQuery, state, options)
+    let filterState = new FilterState();
+    return executeFilter(candidates, preparedQuery, filterState, options)
 }
 
 /**
@@ -34,22 +36,28 @@ export function filterSync(candidates, preparedQuery,  options) {
 
 export function filterAsync(candidates, preparedQuery,  callback, options) {
 
-    let internalState = new FilterState();
-    let filterResult = new FilterResult(internalState);
+    let filterState = new FilterState();
+    let filterResult = new FilterResult(filterState);
+    let PromiseCtor = options.promiseImplementation;
 
-    let scheduled = () => {
-        callback( executeFilter(candidates, preparedQuery, internalState, options), filterResult );
-    };
-
-    if(typeof setImmediate === "function"){
-        setImmediate(scheduled)
+    if(isFunction(PromiseCtor)){
+        filterState.promise = new PromiseCtor(
+            (resolve, reject) => {
+                let matches =  executeFilter(candidates, preparedQuery, filterState, options);
+                dispatchResult( matches, filterResult, callback, resolve, reject )
+            }
+        )
     }else{
-        setTimeout(scheduled,0)
-    }
+        defer( () => {
+            let matches =  executeFilter(candidates, preparedQuery, filterState, options);
+            dispatchResult( matches, filterResult, callback, null, null )
+        });
+    } 
 
     return filterResult;
 
 }
+
 
 /**
  *
@@ -72,7 +80,7 @@ function executeFilter(candidates, preparedQuery, state, options) {
     // Else we assume it is the name of a property on candidate object.
     let accessor = null;
     if(key != null){
-        accessor =  utils.isFunction(options.key) ? options.key : (x) => x[key]
+        accessor =  isFunction(options.key) ? options.key : (x) => x[key]
     }
 
     // Init state
@@ -118,7 +126,7 @@ function processCollection(collection, preparedQuery, state, options){
     // Collection is an array
     //
 
-    if( utils.isArray(collection) ){
+    if( isArray(collection) ){
         for(let i = 0; i<= collection.length; i++){
             if( !processItem( collection[i], preparedQuery, state, options) ) break;
         }
@@ -129,10 +137,10 @@ function processCollection(collection, preparedQuery, state, options){
     // Collection is an Iterable or Iterator (es6 protocol)
     //
 
-    let iterator = utils.getIterator(collection);
+    let iterator = getIterator(collection);
     if(iterator != null){
         let item = iterator.next();
-        if(utils.isIteratorItem(item)){
+        if(isIteratorItem(item)){
             while(!item.done){
                 if( !processItem( item.value, preparedQuery, state, options) ) break;
                 item = iterator.next()
@@ -152,7 +160,7 @@ function processCollection(collection, preparedQuery, state, options){
     //      so we continue iteration but short circuit most of the work.
 
     let cont = true;
-    if( utils.isFunction(collection.forEach) ) {
+    if( isFunction(collection.forEach) ) {
         collection.forEach((item) => cont = cont && processItem(item, preparedQuery, state, options));
         return true;
     }
@@ -195,4 +203,27 @@ function pluckCandidates(a) {
 
 function sortCandidates(a, b) {
     return b.score - a.score;
+}
+
+let defer = isFunction(env.global.setImmediate)
+    ? env.global.setImmediate
+    : (sheduled) => setTimeout(scheduled,0);
+
+function dispatchResult( matches, filterResult, callback, promiseResolve, promiseReject ){
+
+    if(isFunction(callback)){
+        callback.call(null, matches, filterResult)
+    }
+
+    if(filterResult.isCanceled()){
+        if(isFunction(promiseReject)) {
+            promiseReject.call(null, matches)
+        }
+
+    }else{
+        if(isFunction(promiseResolve)) {
+            promiseResolve.call(null, matches)
+        }
+    }
+
 }

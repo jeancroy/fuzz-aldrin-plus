@@ -57,6 +57,8 @@ export function getDefaults(env) {
      * @property {number|null} maxResults - Output the top `maxResults` best results at most.
      * @property {bool} outputScore - If true output is an array of {candidate,score} else output is an array of candidates
      *
+     * @property {function} promiseImplementation - global `Promise` object or compatible implementation.
+     *
      */
 
     /**
@@ -65,7 +67,8 @@ export function getDefaults(env) {
     let filterOptions = extend(scoringOptions, {
         key: null,
         maxResults: null,
-        outputScore: false
+        outputScore: false,
+        promiseImplementation: ( env.global.Promise || null )
     });
 
 

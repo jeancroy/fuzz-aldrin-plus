@@ -6,7 +6,8 @@ export default {
 };
 
 export function isFunction(fn){
-    return typeof fn === "function"
+    return !!fn &&
+       Object.prototype.toString.call(fn) === '[object Function]';
 }
 
 export function isArray(tentativeArray){

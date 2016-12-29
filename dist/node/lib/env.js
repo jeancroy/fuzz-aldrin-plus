@@ -1,1 +1,36 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0});var _typeof="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},isNode="object"===("undefined"==typeof process?"undefined":_typeof(process))&&"[object process]"===Object.prototype.toString.call(process),isBrowser=!isNode&&"object"===("undefined"==typeof window?"undefined":_typeof(window))&&"[object Window]"===Object.prototype.toString.call(window),defaultPathSeparator=isNode&&"win32"===process.platform?"\\":"/",env=exports.env={isNode:isNode,isBrowser:isBrowser,defaultPathSeparator:defaultPathSeparator};exports.default={env:env};
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+//
+// Detect node.js or browser to set default path separator
+//
+
+
+var objectToString = Object.prototype.toString;
+
+var hasGlobal = typeof global !== 'undefined' && objectToString.call(global) === '[object global]';
+var hasProcess = typeof process !== 'undefined' && objectToString.call(process) === '[object process]';
+var hasWindow = typeof window !== 'undefined' && objectToString.call(window) === '[object Window]';
+
+var isNode = hasGlobal && hasProcess;
+var isBrowser = !isNode && hasWindow;
+
+// On node js we assume the list of candidates match local OS path format.
+// While on browser assume that we are dealing with url
+// Use 'options.pathSeparator' if you need a behavior different from those assumptions.
+var defaultPathSeparator = isNode && process.platform === "win32" ? "\\" : "/";
+
+var root = isBrowser ? window : isNode ? global : {};
+
+var env = exports.env = {
+    isNode: isNode,
+    isBrowser: isBrowser,
+    defaultPathSeparator: defaultPathSeparator,
+    global: root
+};
+
+exports.default = {
+    env: env
+};
