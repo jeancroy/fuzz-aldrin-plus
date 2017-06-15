@@ -87,7 +87,7 @@ exports.wrap = (string, query, options) ->
       strPos = matchPos
 
   #Get string after last match
-  if(strPos < string.length - 1)
+  if(strPos <= string.length - 1)
     output += string.substring(strPos)
 
   #return wrapped text
