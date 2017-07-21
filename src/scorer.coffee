@@ -113,56 +113,41 @@ exports.computeScore = computeScore = (subject, subject_lw, preparedQuery) ->
   # (Smith Waterman algorithm)
 
 
-  #Init
+  # Init
   score_row = new Array(n)
   csc_row = new Array(n)
   sz = scoreSize(n, m)
 
   miss_budget = Math.ceil(miss_coeff * n) + 5
   miss_left = miss_budget
+  csc_should_rebuild = true
 
-  #Fill with 0
+  # Fill with 0
   j = -1
   while ++j < n
     score_row[j] = 0
     csc_row[j] = 0
 
-  #TODO: Check if speedup is important on average.
-  #This assume first and last char are correct. Possibly breaking some allowError score.
-
-  # Limit the search to the active region
-  # for example with query `abc`, subject `____a_bc_ac_c____`
-  # there's a region before first `a` and after last `c`
-  # that can be simplified out of the matching process
-
-  # Before first occurrence in subject of first letter of query, or -1
-  i = subject_lw.indexOf(query_lw[0])
-  if(i > -1) then i--
-
-  # After last occurrence of last letter of query,
-  mm = subject_lw.lastIndexOf(query_lw[n - 1], m)
-  if(mm > i) then m = mm + 1
-
-  csc_invalid = true
-
+  i = -1
   while ++i < m     #foreach char si of subject
     si_lw = subject_lw[i]
 
     # if si_lw is not in query
-    if not preparedQuery.charCodes[si_lw.charCodeAt 0]?
-      # reset csc_row and move to next
-      if csc_invalid isnt true
+    if not si_lw.charCodeAt(0) of preparedQuery.charCodes
+      # reset csc_row and move to next subject char
+      # unless we just cleaned it then keep cleaned version.
+      if csc_should_rebuild
         j = -1
         while ++j < n
           csc_row[j] = 0
-        csc_invalid = true
+        csc_should_rebuild = false
       continue
 
     score = 0
     score_diag = 0
     csc_diag = 0
     record_miss = true
-    csc_invalid = false
+    csc_should_rebuild = true
 
     j = -1 #0..n-1
     while ++j < n   #foreach char qj of query
@@ -198,7 +183,8 @@ exports.computeScore = computeScore = (subject, subject_lw, preparedQuery) ->
           # If budget is exhausted exit
           # Each character of query have it's score history stored in score_row
           # To get full query score use last item of row.
-          return score_row[n - 1] * sz if(record_miss and --miss_left <= 0)
+          if(record_miss and --miss_left <= 0) then return Math.max(score, score_row[n - 1]) * sz
+
           record_miss = false
 
 

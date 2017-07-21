@@ -497,6 +497,21 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'core')).toBe candidates[2]
 
+      candidates = [
+        path.join('app', 'components', 'admin', 'member', 'modals', 'edit-payment.html'),
+        path.join('app', 'components', 'admin', 'member', 'edit', 'edit.html'),
+        path.join('app', 'components', 'admin', 'member', 'modals', 'edit-paykent.html'),
+      ]
+
+      expect(bestMatch(candidates, 'member edit htm', debug: true)).toBe candidates[1]
+      expect(bestMatch(candidates, 'member edit html', debug: true)).toBe candidates[1]
+
+      expect(bestMatch(candidates, 'edit htm')).toBe candidates[1]
+      expect(bestMatch(candidates, 'edit html')).toBe candidates[1]
+
+
+
+
     it "prefers matches that are together in the basename (even if basename is longer)", ->
 
       candidates = [
