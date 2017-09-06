@@ -770,14 +770,14 @@ describe "filtering", ->
       expect(bestMatch(candidates, 'appcon')).toBe candidates[1]
 
 
-    it "prefer path together to shorter path", ->
-
-      candidates = [
-        path.join('app', 'controllers', 'shipments_controller.rb'),
-        path.join('app', 'controllers', 'core', 'shipments_controller.rb')
-      ]
-
-      expect(bestMatch(candidates, 'core shipments controller')).toBe candidates[1]
+  #    it "prefer path together to shorter path", ->
+  #
+  #      candidates = [
+  #        path.join('app', 'controllers', 'shipments_controller.rb'),
+  #        path.join('app', 'controllers', 'core', 'shipments_controller.rb')
+  #      ]
+  #
+  #      expect(bestMatch(candidates, 'core shipments controller')).toBe candidates[1]
 
   #
   #  Optional Characters
