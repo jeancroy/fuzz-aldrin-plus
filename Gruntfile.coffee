@@ -27,7 +27,7 @@ module.exports = (grunt) ->
         browserifyOptions:
           standalone: 'fuzzaldrin'
       dist:
-        src: ['lib/fuzzaldrin.js']
+        src: 'lib/fuzzaldrin.js'
         dest: 'dist-browser/fuzzaldrin-plus.js'
 
     uglify:

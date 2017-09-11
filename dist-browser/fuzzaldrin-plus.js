@@ -604,7 +604,7 @@
   };
 
   exports.computeScore = computeScore = function(subject, subject_lw, preparedQuery) {
-    var acro, acro_score, align, csc_diag, csc_invalid, csc_row, csc_score, i, j, m, miss_budget, miss_left, mm, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
+    var acro, acro_score, align, csc_diag, csc_row, csc_score, csc_should_rebuild, i, j, m, miss_budget, miss_left, n, pos, query, query_lw, record_miss, score, score_diag, score_row, score_up, si_lw, start, sz;
     query = preparedQuery.query;
     query_lw = preparedQuery.query_lw;
     m = subject.length;
@@ -623,29 +623,22 @@
     sz = scoreSize(n, m);
     miss_budget = Math.ceil(miss_coeff * n) + 5;
     miss_left = miss_budget;
+    csc_should_rebuild = true;
     j = -1;
     while (++j < n) {
       score_row[j] = 0;
       csc_row[j] = 0;
     }
-    i = subject_lw.indexOf(query_lw[0]);
-    if (i > -1) {
-      i--;
-    }
-    mm = subject_lw.lastIndexOf(query_lw[n - 1], m);
-    if (mm > i) {
-      m = mm + 1;
-    }
-    csc_invalid = true;
+    i = -1;
     while (++i < m) {
       si_lw = subject_lw[i];
-      if (preparedQuery.charCodes[si_lw.charCodeAt(0)] == null) {
-        if (csc_invalid !== true) {
+      if (!si_lw.charCodeAt(0) in preparedQuery.charCodes) {
+        if (csc_should_rebuild) {
           j = -1;
           while (++j < n) {
             csc_row[j] = 0;
           }
-          csc_invalid = true;
+          csc_should_rebuild = false;
         }
         continue;
       }
@@ -653,7 +646,7 @@
       score_diag = 0;
       csc_diag = 0;
       record_miss = true;
-      csc_invalid = false;
+      csc_should_rebuild = true;
       j = -1;
       while (++j < n) {
         score_up = score_row[j];
@@ -670,7 +663,7 @@
             miss_left = miss_budget;
           } else {
             if (record_miss && --miss_left <= 0) {
-              return score_row[n - 1] * sz;
+              return Math.max(score, score_row[n - 1]) * sz;
             }
             record_miss = false;
           }

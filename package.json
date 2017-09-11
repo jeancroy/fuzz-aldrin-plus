@@ -10,7 +10,6 @@
     }
   ],
   "main": "./lib/fuzzaldrin.js",
-  "browser": "./dist-browser/fuzzaldrin-plus.js",
   "scripts": {
     "prepublish": "grunt prepublish",
     "test": "grunt test",
