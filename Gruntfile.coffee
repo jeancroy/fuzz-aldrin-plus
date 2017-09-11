@@ -32,6 +32,7 @@ module.exports = (grunt) ->
 
     uglify:
       options:
+        compress: true
         preserveComments: false
         banner: '/* <%= pkg.name %> - v<%= pkg.version %> - @license: <%= pkg.license %>; @author: Jean Christophe Roy; @site: <%= pkg.homepage %> */\n'
       dist:
