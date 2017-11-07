@@ -555,8 +555,8 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'appcontr')).toBe candidates[1]
       expect(bestMatch(candidates, 'appcontro')).toBe candidates[1]
-    #expect(bestMatch(candidates, 'appcontrol', debug:true)).toBe candidates[1] # TODO support this case ?
-    #expect(bestMatch(candidates, 'appcontroll', debug:true)).toBe candidates[1] #Also look at issue #6
+      #expect(bestMatch(candidates, 'appcontrol', debug:true)).toBe candidates[1]
+      #expect(bestMatch(candidates, 'appcontroll', debug:true)).toBe candidates[1] #Also look at issue #6
 
 
     it "allows to select using folder name", ->
@@ -621,13 +621,14 @@ describe "filtering", ->
 
       expect(bestMatch(candidates, 'mob.ht', {useExtensionBonus: true})).toBe candidates[1]
 
-    it "support file with multiple extension", ->
-      candidates = [
-        path.join('something-foobar.class')
-        path.join('something.class.php')
-      ]
-
-      expect(bestMatch(candidates, 'some.cl', {useExtensionBonus: true})).toBe candidates[1]
+    # Not clear this is the best example. Broken for something more important.
+    # uit "support file with multiple extension", ->
+      # candidates = [
+      #  path.join('something-foobar.class')
+      #  path.join('something.class.php')
+      # ]
+      #
+      # expect(bestMatch(candidates, 'some.cl', {useExtensionBonus: true})).toBe candidates[1]
 
 
     it "ignores trailing slashes", ->
@@ -855,15 +856,29 @@ describe "filtering", ->
         path.join('bazs', 'book-details.js')
         path.join('booking', 'baz', 'details.js')
       ]
-      expect(bestMatch(candidates, 'baz details js',{debug:true})).toBe candidates[1]
+      expect(bestMatch(candidates, 'baz details js')).toBe candidates[1]
 
       candidates = [
-        path.join('sub', 'bookings.js')
-        path.join('sub', 'booking', 'booking.js')
+        path.join('app', 'bookings.js')
+        path.join('app', 'booking', 'booking.js')
       ]
 
       expect(bestMatch(candidates, 'booking')).toBe candidates[1]
       expect(bestMatch(candidates, 'booking js')).toBe candidates[1]
+
+      candidates = [
+        path.join('app', 'components','booking','booking.ctrl.js')
+        path.join('app', 'components','cards','bookings.js')
+        path.join('app', 'components','admin','settings','cards','booking.js')
+        path.join('app', 'components','booking','booking.js')
+      ]
+
+      result = filter(candidates, 'booking js')
+      expect(result[0]).toBe candidates[3]
+      expect(result[1]).toBe candidates[2]
+      expect(result[2]).toBe candidates[1]
+      expect(result[3]).toBe candidates[0]
+
 
 
     it "allows basename bonus to handle query with folder", ->

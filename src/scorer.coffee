@@ -15,7 +15,7 @@ wm = 150
 
 #Fading function
 pos_bonus = 20 # The character from 0..pos_bonus receive a greater bonus for being at the start of string.
-tau_size = 85 # Full path length at which the whole match score is halved.
+tau_size = 150 # Full path length at which the whole match score is halved.
 
 # Miss count
 # When subject[i] is query[j] we register a hit.

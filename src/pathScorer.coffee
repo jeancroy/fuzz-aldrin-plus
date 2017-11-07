@@ -1,8 +1,8 @@
 {isMatch, computeScore, scoreSize} = require './scorer'
 
 
-tau_depth = 13 # Directory depth at which the full path influence is halved.
-file_coeff = 1.5 # Full path is also penalized for length of basename. This adjust a scale factor for that penalty.
+tau_depth = 20 # Directory depth at which the full path influence is halved.
+file_coeff = 2.5 # Full path is also penalized for length of basename. This adjust a scale factor for that penalty.
 
 #
 # Main export
