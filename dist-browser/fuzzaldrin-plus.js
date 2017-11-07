@@ -1,4 +1,4 @@
-/* fuzzaldrin-plus - v0.4.1 - @license: MIT; @author: Jean Christophe Roy; @site: https://github.com/jeancroy/fuzzaldrin-plus */
+/* fuzzaldrin-plus - v0.5.0 - @license: MIT; @author: Jean Christophe Roy; @site: https://github.com/jeancroy/fuzzaldrin-plus */
 
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.fuzzaldrin = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function() {
@@ -392,7 +392,7 @@
 
   tau_depth = 13;
 
-  file_coeff = 1.2;
+  file_coeff = 1.5;
 
   exports.score = function(string, query, options) {
     var allowErrors, preparedQuery, score, string_lw;
@@ -773,6 +773,9 @@
       if (query[j] === subject[i]) {
         sameCase++;
       }
+    }
+    if (sz < k) {
+      i--;
     }
     if (sz === 1) {
       return 1 + 2 * sameCase;

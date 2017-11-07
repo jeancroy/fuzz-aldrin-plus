@@ -311,6 +311,11 @@ exports.scoreConsecutives = scoreConsecutives = (subject, subject_lw, query, que
   while (++sz < k and query_lw[++j] is subject_lw[++i])
     sameCase++ if (query[j] is subject[i])
 
+
+  # If we quit because of a non match
+  # replace cursor to the last match
+  if sz < k then i--
+
   # Faster path for single match.
   # Isolated character match occurs often and are not really interesting.
   # Fast path so we don't compute expensive pattern score on them.

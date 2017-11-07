@@ -4,6 +4,7 @@ path = require 'path'
 bestMatch = (candidates, query, options = {}) ->
 
   {debug} = options
+
   if debug?
     console.log("\n = Against query: #{query} = ")
     console.log(" #{score(c, query)}: #{c}") for c in candidates
@@ -12,7 +13,8 @@ bestMatch = (candidates, query, options = {}) ->
 
 rootPath = (segments...) ->
   joinedPath = if process.platform is 'win32' then 'C:\\' else '/'
-  #joinedPath = path.sep
+  #joinedPath = '/'
+
   for segment in segments
     if segment is path.sep
       joinedPath += segment
@@ -69,15 +71,24 @@ describe "filtering", ->
     it "it ranks full-word > start-of-word > end-of-word > middle-of-word > split > scattered letters", ->
 
       candidates = [
-        'controller',
-        '0 co re 00',
-        '0core0 000',
-        '0core 0000',
-        '0 core0 00',
-        '0 core 000'
+        'controller x',
+        '0_co_re_00 x',
+        '0core0_000 x',
+        '0core_0000 x',
+        '0_core0_00 x',
+        '0_core_000 x'
       ]
 
       result = filter(candidates, 'core')
+      expect(result[0]).toBe candidates[5]
+      expect(result[1]).toBe candidates[4]
+      expect(result[2]).toBe candidates[3]
+      expect(result[3]).toBe candidates[2]
+      expect(result[4]).toBe candidates[1]
+      expect(result[5]).toBe candidates[0]
+
+      # Also as part of a multiword query
+      result = filter(candidates, 'core x')
       expect(result[0]).toBe candidates[5]
       expect(result[1]).toBe candidates[4]
       expect(result[2]).toBe candidates[3]
@@ -159,11 +170,11 @@ describe "filtering", ->
     it "ranks full-word > start-of-word > end-of-word > middle-of-word > scattered letters", ->
 
       candidates = [
-        'model-controller'
-        'model-0core0-000'
-        'model-0core-0000'
-        'model-0-core0-00'
-        'model-0-core-000'
+        'model-controller.x'
+        'model-0core0-000.x'
+        'model-0core-0000.x'
+        'model-0-core0-00.x'
+        'model-0-core-000.x'
       ]
 
       result = filter(candidates, 'modelcore')
@@ -173,17 +184,32 @@ describe "filtering", ->
       expect(result[3]).toBe candidates[1]
       expect(result[4]).toBe candidates[0]
 
+      result = filter(candidates, 'modelcorex')
+      expect(result[0]).toBe candidates[4]
+      expect(result[1]).toBe candidates[3]
+      expect(result[2]).toBe candidates[2]
+      expect(result[3]).toBe candidates[1]
+      expect(result[4]).toBe candidates[0]
+
+
     it "ranks full-word > start-of-word > end-of-word > middle-of-word > scattered letters (VS directory depth)", ->
 
       candidates = [
-        path.join('model', 'controller'),
-        path.join('0', 'model', '0core0_0'),
-        path.join('0', '0', 'model', '0core_00'),
-        path.join('0', '0', '0', 'model', 'core0_00'),
-        path.join('0', '0', '0', '0', 'model', 'core_000')
+        path.join('model', 'controller.x'),
+        path.join('0', 'model', '0core0_0.x'),
+        path.join('0', '0', 'model', '0core_00.x'),
+        path.join('0', '0', '0', 'model', 'core0_00.x'),
+        path.join('0', '0', '0', '0', 'model', 'core_000.x')
       ]
 
       result = filter(candidates, 'model core')
+      expect(result[0]).toBe candidates[4]
+      expect(result[1]).toBe candidates[3]
+      expect(result[2]).toBe candidates[2]
+      expect(result[3]).toBe candidates[1]
+      expect(result[4]).toBe candidates[0]
+
+      result = filter(candidates, 'model core x')
       expect(result[0]).toBe candidates[4]
       expect(result[1]).toBe candidates[3]
       expect(result[2]).toBe candidates[2]
@@ -503,8 +529,8 @@ describe "filtering", ->
         path.join('app', 'components', 'admin', 'member', 'modals', 'edit-paykent.html'),
       ]
 
-      expect(bestMatch(candidates, 'member edit htm', debug: true)).toBe candidates[1]
-      expect(bestMatch(candidates, 'member edit html', debug: true)).toBe candidates[1]
+      expect(bestMatch(candidates, 'member edit htm')).toBe candidates[1]
+      expect(bestMatch(candidates, 'member edit html')).toBe candidates[1]
 
       expect(bestMatch(candidates, 'edit htm')).toBe candidates[1]
       expect(bestMatch(candidates, 'edit html')).toBe candidates[1]
@@ -824,6 +850,21 @@ describe "filtering", ->
         rootPath('foo', 'bar foo')
       ]
       expect(bestMatch(candidates, 'br f')).toBe candidates[1]
+
+      candidates = [
+        path.join('bazs', 'book-details.js')
+        path.join('booking', 'baz', 'details.js')
+      ]
+      expect(bestMatch(candidates, 'baz details js',{debug:true})).toBe candidates[1]
+
+      candidates = [
+        path.join('sub', 'bookings.js')
+        path.join('sub', 'booking', 'booking.js')
+      ]
+
+      expect(bestMatch(candidates, 'booking')).toBe candidates[1]
+      expect(bestMatch(candidates, 'booking js')).toBe candidates[1]
+
 
     it "allows basename bonus to handle query with folder", ->
 
