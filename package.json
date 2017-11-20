@@ -1,6 +1,6 @@
 {
   "name": "fuzzaldrin-plus",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Fuzzy filtering and string similarity scoring - compatible with fuzzaldrin",
   "license": "MIT",
   "licenses": [
